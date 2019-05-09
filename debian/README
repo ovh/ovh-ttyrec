@@ -1,0 +1,7 @@
+The Debian Package ovh-ttyrec
+-----------------------------
+
+Records terminal sessions.
+See included README.md for more information.
+
+ -- Stéphane Lesimple <stephane.lesimple@corp.ovh.com>  Thu, 09 May 2019 12:56:27 +0200

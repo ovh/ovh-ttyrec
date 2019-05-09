@@ -1,0 +1,6 @@
+ovh-ttyrec (1.1.5.0) master; urgency=medium
+
+  * First public release
+  * Add -c option to enable cheatcodes, as they're now disabled by default
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Thu, 09 May 2019 12:55:21 +0200

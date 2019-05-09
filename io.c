@@ -1,4 +1,10 @@
-/*
+/* Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ * Copyright 2001-2019 The ovh-ttyrec Authors. All rights reserved.
+ *
+ * This work is based on the original ttyrec, whose license text
+ * can be found below unmodified.
+ *
  * Copyright (c) 2000 Satoru Takabayashi <satoru@namazu.org>
  * All rights reserved.
  *
@@ -40,51 +46,69 @@
 
 #include "ttyrec.h"
 
-#define SWAP_ENDIAN(val) ((unsigned int) ( \
-    (((unsigned int) (val) & (unsigned int) 0x000000ffU) << 24) | \
-    (((unsigned int) (val) & (unsigned int) 0x0000ff00U) <<  8) | \
-    (((unsigned int) (val) & (unsigned int) 0x00ff0000U) >>  8) | \
-    (((unsigned int) (val) & (unsigned int) 0xff000000U) >> 24)))
+#define SWAP_ENDIAN(val)                                             \
+    ((unsigned int)(                                                 \
+         (((unsigned int)(val) & (unsigned int)0x000000ffU) << 24) | \
+         (((unsigned int)(val) & (unsigned int)0x0000ff00U) << 8) |  \
+         (((unsigned int)(val) & (unsigned int)0x00ff0000U) >> 8) |  \
+         (((unsigned int)(val) & (unsigned int)0xff000000U) >> 24)))
 
-static int 
-is_little_endian ()
+
+int read_header(FILE *fp, Header *h);
+int write_header(FILE *fp, Header *h);
+void set_progname(const char *name);
+FILE *efopen(const char *path, const char *mode);
+int edup(int oldfd);
+int edup2(int oldfd, int newfd);
+FILE *efdopen(int fd, const char *mode);
+
+
+static int is_little_endian(void)
 {
     static int retval = -1;
 
-    if (retval == -1) {
-	int n = 1;
-	char *p = (char *)&n;
-	char x[] = {1, 0, 0, 0};
+    if (retval == -1)
+    {
+        int  n   = 1;
+        char *p  = (char *)&n;
+        char x[] = { 1, 0, 0, 0 };
 
-	assert(sizeof(int) == 4);
+        assert(sizeof(int) == 4);
 
-	if (memcmp(p, x, 4) == 0) {
-	    retval = 1;
-	} else {
-	    retval = 0;
-	}
+        if (memcmp(p, x, 4) == 0)
+        {
+            retval = 1;
+        }
+        else
+        {
+            retval = 0;
+        }
     }
 
     return retval;
 }
 
-static int
-convert_to_little_endian (int x)
+
+static int convert_to_little_endian(int x)
 {
-    if (is_little_endian()) {
-	return x;
-    } else {
-	return SWAP_ENDIAN(x);
+    if (is_little_endian())
+    {
+        return x;
+    }
+    else
+    {
+        return SWAP_ENDIAN(x);
     }
 }
 
-int
-read_header (FILE *fp, Header *h)
+
+int read_header(FILE *fp, Header *h)
 {
     int buf[3];
 
-    if (fread(buf, sizeof(int), 3, fp) == 0) {
-	return 0;
+    if (fread(buf, sizeof(int), 3, fp) == 0)
+    {
+        return 0;
     }
 
     h->tv.tv_sec  = convert_to_little_endian(buf[0]);
@@ -94,8 +118,8 @@ read_header (FILE *fp, Header *h)
     return 1;
 }
 
-int
-write_header (FILE *fp, Header *h)
+
+int write_header(FILE *fp, Header *h)
 {
     int buf[3];
 
@@ -103,59 +127,69 @@ write_header (FILE *fp, Header *h)
     buf[1] = convert_to_little_endian(h->tv.tv_usec);
     buf[2] = convert_to_little_endian(h->len);
 
-    if (fwrite(buf, sizeof(int), 3, fp) == 0) {
-	return 0;
+    if (fwrite(buf, sizeof(int), 3, fp) == 0)
+    {
+        return 0;
     }
 
     return 1;
 }
 
+
 static char *progname = "";
-void
-set_progname (const char *name)
+void set_progname(const char *name)
 {
     progname = strdup(name);
 }
 
-FILE *
-efopen (const char *path, const char *mode)
+
+FILE *efopen(const char *path, const char *mode)
 {
     FILE *fp = fopen(path, mode);
-    if (fp == NULL) {
-	fprintf(stderr, "%s: %s: %s\n", progname, path, strerror(errno));
-	exit(EXIT_FAILURE);
+
+    if (fp == NULL)
+    {
+        fprintf(stderr, "%s: %s: %s\n", progname, path, strerror(errno));
+        exit(EXIT_FAILURE);
     }
     return fp;
 }
 
-int
-edup (int oldfd)
+
+int edup(int oldfd)
 {
     int fd = dup(oldfd);
-    if (fd == -1) {
-	fprintf(stderr, "%s: dup failed: %s\n", progname, strerror(errno));
-	exit(EXIT_FAILURE);
+
+    if (fd == -1)
+    {
+        fprintf(stderr, "%s: dup failed: %s\n", progname, strerror(errno));
+        exit(EXIT_FAILURE);
     }
     return fd;
 }
 
-int
-edup2 (int oldfd, int newfd)
+
+int edup2(int oldfd, int newfd)
 {
     int fd = dup2(oldfd, newfd);
-    if (fd == -1) {
-	fprintf(stderr, "%s: dup2 failed: %s\n", progname, strerror(errno));
-	exit(EXIT_FAILURE);
+
+    if (fd == -1)
+    {
+        fprintf(stderr, "%s: dup2 failed: %s\n", progname, strerror(errno));
+        exit(EXIT_FAILURE);
     }
     return fd;
 }
 
-FILE *
-efdopen (int fd, const char *mode)
+
+FILE *efdopen(int fd, const char *mode)
 {
     FILE *fp = fdopen(fd, mode);
-    if (fp == NULL) {
-	fprintf(stderr, "%s: fdopen failed: %s\n", progname, strerror(errno));
-	exit(EXIT_FAILURE);
+
+    if (fp == NULL)
+    {
+        fprintf(stderr, "%s: fdopen failed: %s\n", progname, strerror(errno));
+        exit(EXIT_FAILURE);
     }
+    return fp;
 }

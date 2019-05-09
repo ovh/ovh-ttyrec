@@ -1,4 +1,10 @@
-/*
+/* Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ * Copyright 2001-2019 The ovh-ttyrec Authors. All rights reserved.
+ *
+ * This work is based on the original ttyrec, whose license text
+ * can be found below unmodified.
+ *
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved.
  *
@@ -38,33 +44,39 @@
 #include "io.h"
 #include "ttyrec.h"
 
-int
-calc_time (const char *filename)
+int calc_time(const char *filename);
+
+int calc_time(const char *filename)
 {
     Header start, end;
-    FILE *fp = efopen(filename, "r");
+    FILE   *fp = efopen(filename, "r");
 
     read_header(fp, &start);
+    end.tv.tv_sec = start.tv.tv_sec; // to avoid can-be-uninit warning
     fseek(fp, start.len, SEEK_CUR);
-    while (1) {
-	Header h;
-	if (read_header(fp, &h) == 0) {
-	    break;
-	}
-	end = h;
-	fseek(fp, h.len, SEEK_CUR);
+    while (1)
+    {
+        Header h;
+        if (read_header(fp, &h) == 0)
+        {
+            break;
+        }
+        end = h;
+        fseek(fp, h.len, SEEK_CUR);
     }
     return end.tv.tv_sec - start.tv.tv_sec;
 }
 
-int 
-main (int argc, char **argv)
+
+int main(int argc, char **argv)
 {
     int i;
+
     set_progname(argv[0]);
-    for (i = 1; i < argc; i++) {
-	char *filename = argv[i];
-	printf("%7d	%s\n", calc_time(filename), filename);
+    for (i = 1; i < argc; i++)
+    {
+        char *filename = argv[i];
+        printf("%7d	%s\n", calc_time(filename), filename);
     }
     return 0;
 }

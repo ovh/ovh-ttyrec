@@ -1,0 +1,149 @@
+#! /bin/sh
+curdir=$(dirname $0)
+
+echo '#ifndef CONFIGURE_H' >"$curdir/configure.h"
+echo '#define CONFIGURE_H' >>"$curdir/configure.h"
+
+printf "%b" "Looking for compiler... "
+[ -z "$CC" ] && CC=gcc
+which $CC >/dev/null 2>&1 || CC=clang
+which $CC >/dev/null 2>&1 || CC=cc
+echo "$CC"
+
+LIBS=''
+DEFINES_STR='uses:'
+WARNINGS=''
+
+srcfile=$(mktemp)
+mv $srcfile $srcfile.c
+trap "rm -f $srcfile.c" INT HUP EXIT
+
+printf "%b" "Looking for isastream()... "
+cat >$srcfile.c <<EOF
+#include <stropts.h>
+int main(void) { return isastream(0); }
+EOF
+if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "yes"
+    echo '#define HAVE_isastream' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR isastream"
+else
+    echo "no"
+fi
+
+printf "%b" "Looking for cfmakeraw()... "
+cat >$srcfile.c <<EOF
+#include <termios.h>
+#include <unistd.h>
+int main(void) { cfmakeraw(0); return 0; }
+EOF
+if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "yes"
+    echo '#define HAVE_cfmakeraw' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR cfmakeraw"
+else
+    echo "no"
+fi
+
+printf "%b" "Looking for getpt()... "
+cat >$srcfile.c <<EOF
+#include <stdlib.h>
+int main(void) { return getpt(); }
+EOF
+if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "yes"
+    echo '#define HAVE_getpt' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR getpt"
+else
+    echo "no"
+fi
+
+printf "%b" "Looking for posix_openpt()... "
+cat >$srcfile.c <<EOF
+#include <stdlib.h>
+#include <fcntl.h>
+int main(void) { return posix_openpt(0); }
+EOF
+if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "yes"
+    echo '#define HAVE_posix_openpt' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR posix_openpt"
+else
+    echo "no"
+fi
+
+printf "%b" "Looking for grantpt()... "
+cat >$srcfile.c <<EOF
+#include <stdlib.h>
+int main(void) { (void)ptsname(0); return grantpt(0) + unlockpt(0); }
+EOF
+if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "yes"
+    echo '#define HAVE_grantpt' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR grantpt"
+else
+    echo "no"
+fi
+
+printf "%b" "Looking for openpty()... "
+cat >$srcfile.c <<EOF
+#include <pty.h>
+int main(void) { return openpty(0, 0, 0, 0, 0); }
+EOF
+if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+    echo "yes (pty.h)"
+    LIBS="$LIBS -lutil"
+    echo '#define HAVE_openpty' >>"$curdir/configure.h"
+    echo '#define HAVE_openpty_pty_h' >>"$curdir/configure.h"
+    DEFINES_STR="$DEFINES_STR openpty[pty.h]"
+else
+    cat >$srcfile.c <<EOF
+#include <util.h>
+int main(void) { return openpty(0, 0, 0, 0, 0); }
+EOF
+    if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+        echo "yes (util.h)"
+        LIBS="$LIBS -lutil"
+        echo '#define HAVE_openpty' >>"$curdir/configure.h"
+        echo '#define HAVE_openpty_util_h' >>"$curdir/configure.h"
+        DEFINES_STR="$DEFINES_STR openpty[util.h]"
+    else
+        cat >$srcfile.c <<EOF
+#include <libutil.h>
+int main(void) { return openpty(0, 0, 0, 0, 0); }
+EOF
+        if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+            echo "yes (libutil.h)"
+            LIBS="$LIBS -lutil"
+            echo '#define HAVE_openpty' >>"$curdir/configure.h"
+            echo '#define HAVE_openpty_libutil_h' >>"$curdir/configure.h"
+            DEFINES_STR="$DEFINES_STR openpty[libutil.h]"
+        else
+            echo "no"
+        fi
+    fi
+fi
+
+echo "Checking for supported compiler options..."
+for w in -Wall -Wextra -pedantic -Wno-unused-result -Wbad-function-cast -Wmissing-declarations \
+    -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wstrict-prototypes \
+    -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration
+do
+    echo 'int main(void) { return 0; }' >$srcfile.c
+    if [ $($CC $srcfile.c $w -o /dev/null 2>&1 | wc -l) = 0 ]; then
+        echo "... OK $w"
+        WARNINGS="$WARNINGS $w"
+    else
+        echo "... unsupported $w"
+    fi
+done
+
+sed "s/%CC%/$CC/g;s/%LIBS%/$LIBS/g;s/%WARNINGS%/$WARNINGS/" $(dirname $0)/Makefile.in > $(dirname $0)/Makefile
+
+cat >>"$curdir/configure.h" <<EOF
+#define DEFINES_STR "$DEFINES_STR"
+#endif
+EOF
+
+echo
+echo "You may run make now"

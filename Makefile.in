@@ -1,0 +1,47 @@
+CC = %CC%
+CFLAGS = -O2 -D_GNU_SOURCE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -std=gnu99 %WARNINGS% -Werror
+LIBS = %LIBS%
+
+BINARIES = ttyrec ttyplay ttytime
+DOCS = docs/ttyrec.1
+
+BIN = $(DESTDIR)/usr/bin
+
+all: prog doc
+
+deb:
+	dpkg-buildpackage -b -rfakeroot -us -uc
+
+prog: $(BINARIES)
+
+doc: $(DOCS)
+
+ttyrec.o: ttyrec.c configure.h
+	$(CC) $(CFLAGS) -c ttyrec.c
+
+ttyrec: ttyrec.o io.o
+	$(CC) $(CFLAGS) -pthread -o ttyrec ttyrec.o io.o $(LIBS)
+
+ttyplay: ttyplay.o io.o
+	$(CC) $(CFLAGS) -o ttyplay ttyplay.o io.o
+
+ttytime: ttytime.o io.o
+	$(CC) $(CFLAGS) -o ttytime ttytime.o io.o
+
+docs/ttyrec.1: ttyrec
+	help2man -N --help-option=-h --version-option=-V --no-discard-stderr ./ttyrec > docs/ttyrec.1
+
+clean:
+	rm -f *.o $(BINARIES) $(DOCS) ttyrecord *~ Makefile configure.h
+
+style:
+	uncrustify -c uncrustify.cfg -l C --no-backup *.h *.c
+
+dist:
+	tar cvzf ttyrec.tar.gz *.c *.h docs/ debian/ configure Makefile.in uncrustify.cfg
+
+install:
+	install -d -m 0755 -o root -g root $(BIN)
+	install    -m 0755 -o root -g root ttyrec $(BIN)
+	install    -m 0755 -o root -g root ttyplay $(BIN)
+	install    -m 0755 -o root -g root ttytime $(BIN)
