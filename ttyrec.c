@@ -1,4 +1,5 @@
 // vim: noai:ts=4:sw=4:expandtab:
+
 /* Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file.
  * Copyright 2001-2019 The ovh-ttyrec Authors. All rights reserved.
@@ -187,17 +188,17 @@ static const char version[] = "1.1.5.0";
 static FILE *fscript;
 static int  child;
 static int  subchild;
-static char *me            = NULL;
+static char *me = NULL;
 #ifdef HAVE_openpty
 static int openpty_used    = 0;
 static int openpty_disable = 0;
 #endif
 // below: only used in notty mode
-int         stdout_pipe[2]; // subchild will write to it, child will read from it
-int         stderr_pipe[2]; // subchild will write to it, child will read from it
+int stdout_pipe[2];         // subchild will write to it, child will read from it
+int stderr_pipe[2];         // subchild will write to it, child will read from it
 // below: only used in tty mode
-static int  master;
-static int  slave;
+static int master;
+static int slave;
 
 static char *fname       = NULL;
 static char *dname       = NULL;
@@ -512,9 +513,16 @@ int main(int argc, char **argv)
     parent_stdin_isatty = isatty(0);
     switch (opt_want_tty)
     {
-        case 2:  use_tty = 1; break;
-        case 0:  use_tty = 0; break;
-        default: use_tty = parent_stdin_isatty;
+    case 2:
+        use_tty = 1;
+        break;
+
+    case 0:
+        use_tty = 0;
+        break;
+
+    default:
+        use_tty = parent_stdin_isatty;
     }
     printdbg("parent: isatty(stdin) == %d, opt_want_tty == %d, use_tty == %d\r\n", parent_stdin_isatty, opt_want_tty, use_tty);
 
@@ -597,6 +605,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
+
 void handle_cheatcodes(char c)
 {
     static int lockseq = 0;
@@ -622,9 +631,9 @@ void handle_cheatcodes(char c)
     }
 
     // KILL
-    if ((c == '\x0b' && (killseq == 0 || killseq == 4)) || // ^K
-        (c == '\x09' && (killseq == 1 || killseq == 5)) || // ^I
-        (c == '\x0c' && (killseq == 2 || killseq == 3 || killseq == 6 || killseq == 7))) // ^L
+    if (((c == '\x0b') && ((killseq == 0) || (killseq == 4))) ||                                   // ^K
+        ((c == '\x09') && ((killseq == 1) || (killseq == 5))) ||                                   // ^I
+        ((c == '\x0c') && ((killseq == 2) || (killseq == 3) || (killseq == 6) || (killseq == 7)))) // ^L
     {
         killseq++;
     }
@@ -637,6 +646,7 @@ void handle_cheatcodes(char c)
         kill(child, SIGTERM);
     }
 }
+
 
 // called by parent
 void doinput(void)
@@ -948,7 +958,7 @@ void *timeout_watcher(void *arg)
     {
         sleep(1);
         // handle lock: if input is idle, and we have a pseudotty, lock
-        if (timeout_lock > 0 && use_tty)
+        if ((timeout_lock > 0) && use_tty)
         {
             if (!locked_since && (time(NULL) - last_activity > timeout_lock))
             {
@@ -988,7 +998,7 @@ void dooutput(void)
     int                target_fd          = 1; // stdout by default
 
     setbuf(stdout, NULL);
-    (void)close(0); // the subchild will consume it, not us
+    (void)close(0);                            // the subchild will consume it, not us
 #ifdef HAVE_openpty
     if (openpty_used)
     {
@@ -1127,7 +1137,7 @@ void dooutput(void)
             }
         }
 
-        if (!locked_since && cc > 0)
+        if (!locked_since && (cc > 0))
         {
             h.len = cc;
             gettimeofday(&h.tv, NULL);
@@ -1353,24 +1363,23 @@ void getmaster(void)
     // it's not *actually* expected by people using -T always without a tty
     struct termios mastert;
     memset(&mastert, '\0', sizeof(mastert));
-    if (tcgetattr(master, &mastert) == 0 && mastert.c_lflag == 0)
+    if ((tcgetattr(master, &mastert) == 0) && (mastert.c_lflag == 0))
     {
-
         printdbg("fixing master pty attrs\r\n");
         mastert.c_iflag = IXON + ICRNL;  // 02400
         mastert.c_oflag = OPOST + ONLCR; // 05
         mastert.c_cflag = 0277;          //B38400 + CSIZE + CREAD;
         mastert.c_lflag = ISIG + ICANON + ECHO + ECHOE + ECHOK + ECHOKE + ECHOCTL + IEXTEN;
         // apply the c_cc config of a classic pseudotty given by posix_openpt()
-        mastert.c_cc[VINTR]    = 3;
-        mastert.c_cc[VQUIT]    = 28;
-        mastert.c_cc[VERASE]   = 127;
-        mastert.c_cc[VKILL]    = 21;
-        mastert.c_cc[VEOF]     = 4;
-        mastert.c_cc[VTIME]    = 0;
-        mastert.c_cc[VMIN]     = 1;
+        mastert.c_cc[VINTR]  = 3;
+        mastert.c_cc[VQUIT]  = 28;
+        mastert.c_cc[VERASE] = 127;
+        mastert.c_cc[VKILL]  = 21;
+        mastert.c_cc[VEOF]   = 4;
+        mastert.c_cc[VTIME]  = 0;
+        mastert.c_cc[VMIN]   = 1;
 #ifdef VSWTC /* not defined under at least OmniOS */
-        mastert.c_cc[VSWTC]    = 0;
+        mastert.c_cc[VSWTC] = 0;
 #endif
         mastert.c_cc[VSTART]   = 17;
         mastert.c_cc[VSTOP]    = 19;
@@ -1391,7 +1400,7 @@ void getmaster(void)
 
     print_termios_info(master, "openpty master termios");
     print_termios_info(slave, "openpty slave termios");
-    
+
     return;
 # else
     // else, try the /dev/ptyXX way
