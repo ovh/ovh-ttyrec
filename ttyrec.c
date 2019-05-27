@@ -732,6 +732,7 @@ void doinput(void)
                 if (write(master, ibuf, cc) == -1)
                 {
                     perror("write[parent-master]");
+                    fail();
                 }
                 last_activity = time(NULL);
                 if (cc == 1)
