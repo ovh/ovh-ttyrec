@@ -37,6 +37,7 @@ long get_compress_level(void)
     return compress_level;
 }
 
+
 size_t fread_wrapper(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     if (compress_mode == COMPRESS_NONE)

@@ -27,8 +27,8 @@ void zstd_set_max_flush(long seconds)
 
 size_t fwrite_wrapper_zstd(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    static time_t last_sync = 0;
-    long compress_level = get_compress_level();
+    static time_t last_sync      = 0;
+    long          compress_level = get_compress_level();
 
     if (cstream == NULL)
     {
