@@ -4,18 +4,13 @@ LDFLAGS = -L/usr/local/lib
 LDLIBS = %LDLIBS%
 
 BINARIES = ttyrec ttyplay ttytime
-DOCS = docs/ttyrec.1
 
 BIN = $(DESTDIR)/usr/bin
 
-all: prog doc
+all: $(BINARIES)
 
 deb:
 	dpkg-buildpackage -b -rfakeroot -us -uc
-
-prog: $(BINARIES)
-
-doc: $(DOCS)
 
 ttyrec: ttyrec.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS) -pthread
@@ -26,11 +21,8 @@ ttyplay: ttyplay.o io.o compress.o %COMPRESS_ZSTD%
 ttytime: ttytime.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttytime.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
 
-docs/ttyrec.1: ttyrec
-	help2man -N --help-option=-h --version-option=-V --no-discard-stderr ./ttyrec > $@
-
 clean:
-	rm -f *.o $(BINARIES) $(DOCS) ttyrecord *~
+	rm -f *.o $(BINARIES) ttyrecord *~
 
 distclean: clean
 	rm -f Makefile configure.h
