@@ -529,13 +529,13 @@ int main(int argc, char **argv)
     if (use_tty)
     {
         getmaster();
-        print_termios_info(master, "parent master termios");
-        print_termios_info(0, "parent stdin before fixtty termios");
+        print_termios_info(master, "parent master");
+        print_termios_info(0, "parent stdin b4 fixtty");
         if (parent_stdin_isatty)
         {
             fixtty();
         }
-        print_termios_info(0, "parent stdin after fixtty termios");
+        print_termios_info(0, "parent stdin after fixtty");
     }
     else
     {
@@ -562,7 +562,7 @@ int main(int argc, char **argv)
     {
         // we are the child
         printdbg("child pid is %ld\r\n", (long int)getpid());
-        print_termios_info(0, "child stdin termios");
+        print_termios_info(0, "child stdin");
         subchild = child = fork();
         if (child < 0)
         {
@@ -579,7 +579,7 @@ int main(int argc, char **argv)
         {
             // we are the subchild
             printdbg("subchild pid is %ld\r\n", (long int)getpid());
-            print_termios_info(0, "subchild stdin termios");
+            print_termios_info(0, "subchild stdin");
             me = "subchild";
             doshell(command, params);
         }
@@ -677,7 +677,7 @@ void doinput(void)
 
     if (use_tty)
     {
-        print_termios_info(master, "parent master termios in doinput");
+        print_termios_info(master, "parent master in doinput");
 
         while ((cc = read(0, ibuf, BUFSIZ)) > 0)
         {
@@ -1192,7 +1192,7 @@ void doshell(const char *command, char **params)
     if (use_tty)
     {
         getslave();
-        print_termios_info(slave, "subchild slave termios");
+        print_termios_info(slave, "subchild slave");
         (void)close(master);
         (void)dup2(slave, 0);
         (void)dup2(slave, 1);
@@ -1586,16 +1586,101 @@ void print_termios_info(int fd, const char *prefix)
         memset(&t, '\0', sizeof(t));
         if (tcgetattr(fd, &t))
         {
-            fprintf(stderr, "%35s: %s\r\n", prefix, strerror(errno));
+            fprintf(stderr, "%25s: %s\r\n", prefix, strerror(errno));
         }
         else
         {
-            fprintf(stderr, "%35s: iflag=%06lo oflag=%02lo cflag=%06lo lflag=%06lo c_cc=", prefix, (unsigned long)t.c_iflag, (unsigned long)t.c_oflag, (unsigned long)t.c_cflag, (unsigned long)t.c_lflag);
+            char dbgline[BUFSIZ];
+            dbgline[0] = '\0';
+            snprintf(dbgline, BUFSIZ, "%25s: i=%05o o=%03o c=%05o l=%06o, i: ", prefix, t.c_iflag, t.c_oflag, t.c_cflag, t.c_lflag);
+#define IFLAG(f)                                                                                \
+    if (t.c_iflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); \
+    }
+#define OFLAG(f)    if (t.c_oflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
+#define CFLAG(f)    if (t.c_cflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
+#define LFLAG(f)    if (t.c_lflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
+
+#define CSWITCH(f) \
+case f:            \
+    strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); break;
+            IFLAG(IGNBRK);
+            IFLAG(BRKINT);
+            IFLAG(IGNPAR);
+            IFLAG(PARMRK);
+            IFLAG(INPCK);
+            IFLAG(ISTRIP);
+            IFLAG(INLCR);
+            IFLAG(IGNCR);
+            IFLAG(ICRNL);
+            IFLAG(IUCLC);
+            IFLAG(IXON);
+            IFLAG(IXANY);
+            IFLAG(IXOFF);
+            IFLAG(IMAXBEL);
+            IFLAG(IUTF8);
+            strncat(dbgline + strlen(dbgline), "o: ", BUFSIZ - strlen(dbgline));
+            OFLAG(OPOST);
+            OFLAG(OLCUC);
+            OFLAG(ONLCR);
+            OFLAG(OCRNL);
+            OFLAG(ONLRET);
+            OFLAG(OFILL);
+            OFLAG(OFDEL);
+            strncat(dbgline + strlen(dbgline), "c: ", BUFSIZ - strlen(dbgline));
+            switch (t.c_cflag & B38400)
+            {
+                CSWITCH(B38400);
+                CSWITCH(B19200);
+                CSWITCH(B9600);
+                CSWITCH(B4800);
+                CSWITCH(B2400);
+                CSWITCH(B1200);
+                CSWITCH(B600);
+                CSWITCH(B300);
+                CSWITCH(B150);
+                CSWITCH(B75);
+                CSWITCH(B50);
+                CSWITCH(B0);
+            }
+            switch (t.c_cflag & CS8)
+            {
+                CSWITCH(CS8);
+                CSWITCH(CS7);
+                CSWITCH(CS6);
+                CSWITCH(CS5);
+            }
+            CFLAG(CSTOPB);
+            CFLAG(CREAD);
+            CFLAG(PARENB);
+            CFLAG(PARODD);
+            CFLAG(CLOCAL);
+            strncat(dbgline + strlen(dbgline), "l: ", BUFSIZ - strlen(dbgline));
+            LFLAG(ISIG);
+            LFLAG(ICANON);
+            LFLAG(XCASE);
+            LFLAG(ECHO);
+            LFLAG(ECHOE);
+            LFLAG(ECHOK);
+            LFLAG(ECHONL);
+            LFLAG(NOFLSH);
+            LFLAG(TOSTOP);
+            LFLAG(ECHOCTL);
+            LFLAG(ECHOPRT);
+            LFLAG(ECHOKE);
+            LFLAG(FLUSHO);
+            LFLAG(PENDIN);
+            LFLAG(IEXTEN);
+#undef IFLAG
+#undef OFLAG
+#undef CFLAG
+#undef LFLAG
+#undef CSWITCH
+            strncat(dbgline + strlen(dbgline), "cc: ", BUFSIZ - strlen(dbgline));
             for (cc_t i = 0; i < NCCS; i++)
             {
-                fprintf(stderr, "%02x/", t.c_cc[i]);
+                snprintf(dbgline + strlen(dbgline), BUFSIZ - strlen(dbgline), "%02x/", t.c_cc[i]);
             }
-            fprintf(stderr, "\r\n");
+            fprintf(stderr, "%s\r\n", dbgline);
         }
     }
 }
