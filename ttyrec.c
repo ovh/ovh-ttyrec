@@ -204,6 +204,7 @@ static int slave;
 static char *fname       = NULL;
 static char *dname       = NULL;
 static char *uuid        = NULL;
+static char *namefmt     = NULL;
 static long timeout_lock = 0;
 static long timeout_kill = 0;
 
@@ -325,6 +326,11 @@ int main(int argc, char **argv)
             uuid = strdup(optarg);
             break;
 
+        // custom format
+        case 'F':
+            namefmt = strdup(optarg);
+            break;
+
         // openpty_disable, don't prefer openpty() on systems that support it
         case 'p':
 #ifdef HAVE_openpty
@@ -411,6 +417,12 @@ int main(int argc, char **argv)
     for (int i = 0; i < argc; i++)
     {
         printdbg("option %d: <%s>\r\n", i, argv[i]);
+    }
+
+    if ((namefmt != NULL) && ((dname != NULL) || (fname != NULL) || (uuid != NULL)))
+    {
+        fprintf(stderr, "Option -F (--name-format) can't be used with -d (--dir), -f (--output) or -z (--uuid)\n");
+        fail();
     }
 
     if (uuid == NULL)
@@ -807,11 +819,47 @@ void set_ttyrec_file_name(char **nameptr)
         perror("malloc()");
         fail();
     }
-    if (snprintf(*nameptr, BUFSIZ, "%s/%04u-%02u-%02u.%02u-%02u-%02u.%06lu.%s.ttyrec", dname, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, (long unsigned int)tv.tv_usec, uuid) == -1)
+
+    if (namefmt == NULL)
     {
-        perror("snprintf()");
-        free(*nameptr);
-        fail();
+        // - 4: length of potential ".zst" we might add below
+        if (snprintf(*nameptr, BUFSIZ - 4, "%s/%04u-%02u-%02u.%02u-%02u-%02u.%06lu.%s.ttyrec", dname, t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, (long unsigned int)tv.tv_usec, uuid) == -1)
+        {
+            perror("snprintf()");
+            free(*nameptr);
+            fail();
+        }
+    }
+    else
+    {
+        // - 4: length of potential ".zst" we might add below
+        if (strftime(*nameptr, BUFSIZ - 4, namefmt, t) == 0)
+        {
+            perror("strftime()");
+            free(*nameptr);
+            fail();
+        }
+        (*nameptr)[BUFSIZ - 5] = '\0';
+
+        char usec[7];
+        if (snprintf(usec, 7, "%06lu", tv.tv_usec) < 0)
+        {
+            perror("snprintf()");
+            free(*nameptr);
+            fail();
+        }
+
+        char *ptr = strstr(*nameptr, "#usec#");
+        while (ptr != NULL)
+        {
+            memcpy(ptr, usec, 6);
+            ptr = strstr(ptr + 6, "#usec#");
+        }
+    }
+    if (opt_zstd)
+    {
+        // we can strcat safely becase we used BUFSIZ - 4 above
+        strcat(*nameptr, ".zst");
     }
 }
 
