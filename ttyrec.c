@@ -1104,7 +1104,7 @@ void do_lock(void)
 void *timeout_watcher(void *arg)
 {
     (void)arg;
-    for ( ; ;)
+    for ( ; ; )
     {
         sleep(1);
         // handle lock: if input is idle, and we have a pseudotty, lock
@@ -1179,7 +1179,7 @@ void dooutput(void)
         (void)fputs(ansi_restore, stdout);
     }
 
-    for ( ; ;)
+    for ( ; ; )
     {
         Header h;
 
