@@ -39,10 +39,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
-#include "io.h"
 #include "ttyrec.h"
+#include "io.h"
 
 int calc_time(const char *filename);
 

@@ -44,7 +44,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "io.h"
 #include "ttyrec.h"
+#include "compress.h"
 
 #define SWAP_ENDIAN(val)                                             \
     ((unsigned int)(                                                 \
@@ -52,16 +54,6 @@
          (((unsigned int)(val) & (unsigned int)0x0000ff00U) << 8) |  \
          (((unsigned int)(val) & (unsigned int)0x00ff0000U) >> 8) |  \
          (((unsigned int)(val) & (unsigned int)0xff000000U) >> 24)))
-
-
-int read_header(FILE *fp, Header *h);
-int write_header(FILE *fp, Header *h);
-void set_progname(const char *name);
-FILE *efopen(const char *path, const char *mode);
-int edup(int oldfd);
-int edup2(int oldfd, int newfd);
-FILE *efdopen(int fd, const char *mode);
-
 
 static int is_little_endian(void)
 {
@@ -106,7 +98,7 @@ int read_header(FILE *fp, Header *h)
 {
     int buf[3];
 
-    if (fread(buf, sizeof(int), 3, fp) == 0)
+    if (fread_wrapper(buf, sizeof(int), 3, fp) == 0)
     {
         return 0;
     }
@@ -127,7 +119,7 @@ int write_header(FILE *fp, Header *h)
     buf[1] = convert_to_little_endian(h->tv.tv_usec);
     buf[2] = convert_to_little_endian(h->len);
 
-    if (fwrite(buf, sizeof(int), 3, fp) == 0)
+    if (fwrite_wrapper(buf, sizeof(int), 3, fp) == 0)
     {
         return 0;
     }
