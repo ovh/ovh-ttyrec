@@ -24,6 +24,7 @@ It should work under any POSIX OS that support either `openpty()` or the `grantp
 
 - Drop-in replacement of the classic ttyrec, additional features don't break compatibility
 - The code is portable and OS features that can be used are detected at compile time
+- Supports on-the-fly (de)compression using the zstd algorithm
 - Supports ttyrec output file rotation without interrupting the session
 - Supports locking the session after a keyboard input timeout, optionally displaying a custom message
 - Supports terminating the session after a keyboard input timeout
@@ -37,6 +38,8 @@ It should work under any POSIX OS that support either `openpty()` or the `grantp
 To compile the binaries and build the man pages, just run:
 
         $ ./configure && make
+
+You'll need `libzstd` on the build machine if you want ttyrec to be compiled with zstd support. The library will be statically linked when possible.
 
 If you don't want to build the manpages, or you don't have the required `help2man` tool, you can run `make prog` instead.
 
@@ -73,9 +76,9 @@ Execute a local script remotely with the default remote shell:
 
         $ cat script.sh | ttyrec -- ssh remoteserver
 
-Record a screen session:
+Record a screen session, with on-the-fly compression:
 
-        $ ttyrec screen
+        $ ttyrec -Z screen
 
 Usage information:
 

@@ -49,6 +49,8 @@
 
 #include "ttyrec.h"
 #include "io.h"
+#include "compress.h"
+#include "configure.h"
 
 typedef double (*WaitFunc) (struct timeval prev,
                             struct timeval cur,
@@ -192,7 +194,7 @@ int ttyread(FILE *fp, Header *h, char **buf)
         perror("malloc");
     }
 
-    if (fread(*buf, 1, h->len, fp) == 0)
+    if (fread_wrapper(*buf, 1, h->len, fp) == 0)
     {
         perror("fread");
     }
@@ -291,6 +293,10 @@ void usage(void)
     printf("  -s SPEED Set speed to SPEED [1.0]\n");
     printf("  -n       No wait mode\n");
     printf("  -p       Peek another person's ttyrecord\n");
+#ifdef HAVE_zstd
+    printf("  -Z       Enable on-the-fly zstd decompression\n");
+    printf("\nThe -Z flag is implied if the file suffix is \".zst\"\n");
+#endif
     exit(EXIT_FAILURE);
 }
 
@@ -320,7 +326,11 @@ int main(int argc, char **argv)
     set_progname(argv[0]);
     while (1)
     {
+#ifdef HAVE_zstd
+        int ch = getopt(argc, argv, "s:npZ");
+#else
         int ch = getopt(argc, argv, "s:np");
+#endif
         if (ch == EOF)
         {
             break;
@@ -344,6 +354,12 @@ int main(int argc, char **argv)
             process = ttypeek;
             break;
 
+#ifdef HAVE_zstd
+        case 'Z':
+            set_compress_mode(COMPRESS_ZSTD);
+            break;
+#endif
+
         default:
             usage();
         }
@@ -352,6 +368,12 @@ int main(int argc, char **argv)
     if (optind < argc)
     {
         input = efopen(argv[optind], "r");
+#ifdef HAVE_zstd
+        if (strstr(argv[optind], ".zst") == argv[optind] + strlen(argv[optind]) - 4)
+        {
+            set_compress_mode(COMPRESS_ZSTD);
+        }
+#endif
     }
     else
     {

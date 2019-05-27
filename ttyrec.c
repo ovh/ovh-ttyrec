@@ -84,6 +84,7 @@
 #include "configure.h"
 #include "ttyrec.h"
 #include "io.h"
+#include "compress.h"
 
 #ifdef HAVE_openpty
 # if defined(HAVE_openpty_pty_h)
@@ -93,6 +94,13 @@
 # elif defined(HAVE_openpty_libutil_h)
 #  include <libutil.h>
 # endif
+#endif
+
+// for ZSTD_versionNumber()
+// and zstd_set_max_flush()
+#ifdef HAVE_zstd
+# include <zstd.h>
+# include "compress_zstd.h"
 #endif
 
 #if defined(__linux__)
@@ -215,6 +223,8 @@ static int            parent_stdin_isatty = 0;
 static char line[] = "/dev/ptyXX";
 #endif
 
+static long opt_compress_level  = 0;
+static int  opt_zstd            = 0;
 static int  opt_want_tty        = 1; // never=0, auto=1, force=2
 static int  opt_append          = 0;
 static int  opt_debug           = 0;
@@ -276,6 +286,61 @@ int main(int argc, char **argv)
 
         switch ((char)ch)
         {
+        // long option without short-option counterpart
+        case 0:
+            if (strcmp(long_options[option_index].name, "zstd-try") == 0)
+            {
+#ifdef HAVE_zstd
+                opt_zstd++;
+                set_compress_mode(COMPRESS_ZSTD);
+#endif
+            }
+            else if (strcmp(long_options[option_index].name, "max-flush-time") == 0)
+            {
+#ifdef HAVE_zstd
+                errno = 0;
+                long max_flush_seconds = strtol(optarg, NULL, 10);
+                if ((errno != 0) || (max_flush_seconds <= 0))
+                {
+                    help();
+                    fprintf(stderr, "Invalid value passed to --%s (%s), expected a strictly positive integer\r\n", long_options[option_index].name, optarg);
+                    exit(EXIT_FAILURE);
+                }
+                zstd_set_max_flush(max_flush_seconds);
+#endif
+            }
+            else
+            {
+                fprintf(stderr, "Unknown long option %s\r\n", long_options[option_index].name);
+                fail();
+            }
+            break;
+
+        // on-the-fly zstd compression
+        case 'Z':
+#ifdef HAVE_zstd
+            opt_zstd++;
+            set_compress_mode(COMPRESS_ZSTD);
+#else
+            fprintf(stderr, "zstd support has not been enabled at compile time.\r\n");
+            fail();
+#endif
+            break;
+
+        // compression level of compression algorithm
+        case 'l':
+            errno = 0;
+            opt_compress_level = strtol(optarg, NULL, 10);
+            if ((errno != 0) || (opt_compress_level <= 0))
+            {
+                help();
+                fprintf(stderr, "Invalid value passed to -%c (%s), expected a strictly positive integer\r\n", (char)ch, optarg);
+                exit(EXIT_FAILURE);
+            }
+            printdbg("level %c=%ld\r\n", ch, opt_compress_level);
+            set_compress_level(opt_compress_level);
+            break;
+
         // debug ttyrec
         case 'v':
             opt_debug++;
@@ -399,7 +464,10 @@ int main(int argc, char **argv)
             printf("%s (%s)\r\n", DEFINES_STR, OS_STR);
 #endif
 #ifdef __VERSION__
-            printf("compiler version %s\r\n", __VERSION__);
+            printf("compiler version %s (%s)\r\n", __VERSION__, COMPILER_NAME);
+#endif
+#ifdef HAVE_zstd
+            printf("libzstd version %u (%d.%d.%d)\r\n", ZSTD_versionNumber(), ZSTD_VERSION_MAJOR, ZSTD_VERSION_MINOR, ZSTD_VERSION_RELEASE);
 #endif
             exit(0);
 
@@ -699,7 +767,7 @@ void doinput(void)
     int  cc;
     char ibuf[BUFSIZ];
 
-    (void)fclose(fscript);
+    (void)fclose_wrapper(fscript);
 #ifdef HAVE_openpty
     if (openpty_used)
     {
@@ -875,7 +943,7 @@ void swing_output_file(int signal)
     {
         set_ttyrec_file_name(&newname);
 
-        fclose(fscript);
+        fclose_wrapper(fscript);
 
         if ((fscript = fopen(newname, "w")) == NULL)
         {
@@ -1240,7 +1308,7 @@ void dooutput(void)
                 }
             }
             (void)write_header(fscript, &h);
-            (void)fwrite(obuf, 1, cc, fscript);
+            (void)fwrite_wrapper(obuf, 1, cc, fscript);
             bytes_out    += cc;
             last_activity = time(NULL);
         }
@@ -1270,7 +1338,7 @@ void dooutput(void)
 // called by subchild
 void doshell(const char *command, char **params)
 {
-    (void)fclose(fscript);
+    (void)fclose_wrapper(fscript);
     if (use_tty)
     {
         getslave();
@@ -1352,7 +1420,7 @@ void done(int status)
         printdbg("child: done, cleaning up and exiting with %d (child=%d subchild=%d)\r\n", WEXITSTATUS(status), child, subchild);
         // if we were locked, unlock before exiting to avoid leaving the real terminal of our user stuck in altscreen
         unlock_session(SIGUSR2);
-        (void)fclose(fscript);
+        (void)fclose_wrapper(fscript);
         (void)close(master);
     }
     else
@@ -1786,7 +1854,7 @@ void help(void)
             "  -a, --append            open the ttyrec output file in append mode instead of write-clobber mode\n"                            \
             "  -Z, --zstd              enable on-the-fly compression of output file using zstd,\n"                                            \
             "                            the resulting file will have a '.ttyrec.zst' extension\n"                                            \
-            "      --try-zstd          enable on-the-fly zstd compression, silently fallback to no compression if not available\n"            \
+            "      --zstd-try          enable on-the-fly zstd compression, silently fallback to no compression if not available\n"            \
             "      --max-flush-time S  specify the maximum number of seconds after which we'll force zstd to flush its output buffers\n"      \
             "                            to ensure that even somewhat quiet sessions gets regularly written out to disk, default is %d\n"     \
             "  -l, --level LEVEL       set compression level, must be between 1 and 19 for zstd, default is 3\n"                              \
