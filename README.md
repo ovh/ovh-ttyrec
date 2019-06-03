@@ -11,12 +11,11 @@ ovh-ttyrec is based (and compatible with) the original ttyrec, and can be used a
 
 Efforts have been made to ensure the code is portable. It is known to work under at least:
 
- - Linux
- - FreeBSD
- - NetBSD
- - OpenBSD
- - MacOS
- - OpenSolaris distributions (such as OmniOS)
+ - Linux (any version or flavor)
+ - BSD (known to work under at least FreeBSD, NetBSD, OpenBSD, DragonFlyBSD)
+ - Darwin (macOS aka OS X aka Mac OS X)
+ - Haiku (community OS compatible with BeOS)
+ - OmniOS (community OS compatible with Solaris)
 
 It should work under any POSIX OS that support either `openpty()` or the `grantpt()`/`unlockpt() `mechanisms.
 
@@ -41,7 +40,7 @@ To compile the binaries and build the man pages, just run:
 
 You'll need `libzstd` on the build machine if you want ttyrec to be compiled with zstd support. The library will be statically linked when possible.
 
-If you don't want to build the manpages, or you don't have the required `help2man` tool, you can run `make prog` instead.
+If you explicitly don't want libzstd, define `NO_ZSTD=1` before running configure. If you want it but dynamically linked, define `NO_STATIC_ZSTD=1`.
 
 Installation:
 
@@ -93,4 +92,4 @@ We follow the version format `A.B.C.D`. The following rules apply:
   - C is incremented for any non-hotfix change that stays backwards compatible (a new feature that can be enabled with a new command-line option for example)
   - D is incremented for a quickfix/hotfix, or a change in the build system, docs, etc.
 
-When a digit is incremented, all the "lower" ones go back to zero, i.e. if we are at version 4.7.1.5, and we implement a breaking change, the version number becomes 4.8.0.0.                                                                                                                                                                                 
+When a digit is incremented, all the "lower" ones go back to zero, i.e. if we are at version 4.7.1.5, and we implement a breaking change, the version number becomes 4.8.0.0.

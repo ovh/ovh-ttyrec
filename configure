@@ -12,8 +12,28 @@ echo "$CC"
 
 LDLIBS=''
 DEFINES_STR='uses:'
-CFLAGS=''
+CFLAGS='-Werror -std=c99'
+PTHREAD=''
 COMPRESS_ZSTD=''
+
+os=$(uname -s)
+if [ "$os" = Linux ]; then
+    CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED -D_GNU_SOURCE"
+elif [ "$os" = NetBSD ]; then
+    true
+elif [ "$os" = FreeBSD ]; then
+    true
+elif [ "$os" = OpenBSD ]; then
+    true
+elif [ "$os" = DragonFly ]; then
+    true
+elif [ "$os" = Darwin ]; then
+    true
+elif [ "$os" = SunOS ]; then
+    CFLAGS="$CFLAGS -D__EXTENSIONS__"
+elif [ "$os" = Haiku ]; then
+    true
+fi
 
 srcfile=$(mktemp)
 mv $srcfile $srcfile.c
@@ -32,6 +52,19 @@ else
     exit 1
 fi
 
+printf "%b" "Checking how to get pthread support... "
+cat >$srcfile.c <<EOF
+int main(void) { return 0; }
+EOF
+if $CC -pthread $srcfile.c -o /dev/null >/dev/null 2>&1; then
+    echo "-pthread"
+    PTHREAD='-pthread'
+else
+    echo "-lpthread"
+    PTHREAD='-lpthread'
+fi
+
+
 printf "%b" "Looking for libzstd... "
 cat >$srcfile.c <<EOF
 #include <zstd.h>
@@ -40,7 +73,7 @@ EOF
 if [ "$NO_ZSTD" != 1 ] && $CC $srcfile.c -L/usr/local/lib -I/usr/local/include -lzstd -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_zstd' >>"$curdir/configure.h"
-    COMPRESS_ZSTD='compress_zstd.c'
+    COMPRESS_ZSTD='compress_zstd.o'
     printf "%b" "Checking whether we can link zstd statically... "
     libzstda=$($CC -print-file-name=libzstd.a 2>/dev/null)
     if [ -n "$libzstda" ] && [ -f "$libzstda" ] && [ "$NO_STATIC_ZSTD" != 1 ]; then
@@ -129,7 +162,7 @@ cat >$srcfile.c <<EOF
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
 if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
-    echo "yes (pty.h)"
+    echo "yes (pty.h, libutil)"
     LDLIBS="$LDLIBS -lutil"
     echo '#define HAVE_openpty' >>"$curdir/configure.h"
     echo '#define HAVE_openpty_pty_h' >>"$curdir/configure.h"
@@ -140,7 +173,7 @@ else
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
     if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
-        echo "yes (util.h)"
+        echo "yes (util.h, libutil)"
         LDLIBS="$LDLIBS -lutil"
         echo '#define HAVE_openpty' >>"$curdir/configure.h"
         echo '#define HAVE_openpty_util_h' >>"$curdir/configure.h"
@@ -151,13 +184,25 @@ EOF
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
         if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
-            echo "yes (libutil.h)"
+            echo "yes (libutil.h, libutil)"
             LDLIBS="$LDLIBS -lutil"
             echo '#define HAVE_openpty' >>"$curdir/configure.h"
             echo '#define HAVE_openpty_libutil_h' >>"$curdir/configure.h"
             DEFINES_STR="$DEFINES_STR openpty[libutil.h]"
         else
-            echo "no"
+        cat >$srcfile.c <<EOF
+#include <pty.h>
+int main(void) { return openpty(0, 0, 0, 0, 0); }
+EOF
+            if $CC $srcfile.c -lbsd -o /dev/null >/dev/null 2>&1; then
+                echo "yes (pty.h, libbsd)"
+                echo '#define HAVE_openpty' >>"$curdir/configure.h"
+                echo '#define HAVE_openpty_pty_h' >>"$curdir/configure.h"
+                DEFINES_STR="$DEFINES_STR openpty[pty.h/libbsd]"
+                LDLIBS="$LDLIBS -lbsd"
+            else
+                echo "no"
+            fi
         fi
     fi
 fi
@@ -165,19 +210,29 @@ fi
 echo "Checking for supported compiler options..."
 for w in -Wall -Wextra -pedantic -Wno-unused-result -Wbad-function-cast -Wmissing-declarations \
     -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wstrict-prototypes \
-    -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration -Werror -Wl,--as-needed
+    -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration -Wl,--as-needed
 do
-    [ "$w" = "-Wl,--as-needed" ] && [ "$CC" != "gcc" ] && continue
     echo 'int main(void) { return 0; }' >$srcfile.c
     if [ $($CC $srcfile.c $w -o /dev/null 2>&1 | wc -l) = 0 ]; then
         echo "... OK $w"
-        CFLAGS="$CFLAGS $w"
+        if echo "$w" | grep -q -- '-Wl,'; then
+            LDFLAGS="$LDFLAGS $w"
+        else
+            CFLAGS="$CFLAGS $w"
+        fi
     else
         echo "... unsupported $w"
     fi
 done
 
-sed "s:%CC%:$CC:g;s:%LDLIBS%:$LDLIBS:g;s:%CFLAGS%:$CFLAGS:;s:%COMPRESS_ZSTD%:$COMPRESS_ZSTD:" $(dirname $0)/Makefile.in > $(dirname $0)/Makefile
+cat $(dirname $0)/Makefile.in > $(dirname $0)/Makefile.tmp
+for i in CC LDLIBS CFLAGS COMPRESS_ZSTD PTHREAD
+do
+    replace=$(eval printf "%b" "\"\$$i\"")
+    sed "s:%$i%:$replace:g" $(dirname $0)/Makefile.tmp > $(dirname $0)/Makefile
+    cat $(dirname $0)/Makefile > $(dirname $0)/Makefile.tmp
+done
+rm -f $(dirname $0)/Makefile.tmp
 
 cat >>"$curdir/configure.h" <<EOF
 #define DEFINES_STR "$DEFINES_STR"
