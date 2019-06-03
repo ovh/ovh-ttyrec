@@ -62,24 +62,28 @@
 /*
  * script
  */
-#include <sys/types.h>   // open
-#include <sys/stat.h>    // open
-#include <fcntl.h>       // open, access
-#include <termios.h>     // tcsetattr
-#include <sys/ioctl.h>   // ioctl
-#include <sys/time.h>    // gettimeofday
-#include <sys/wait.h>    // wait3
-#include <libgen.h>      // dirname
-#include <stdio.h>       // printf, ...
-#include <unistd.h>      // read, write, usleep, ...
-#include <string.h>      // strlen, memset, ...
-#include <stdlib.h>      // exit, free, getpt, ...
-#include <errno.h>       // errno
-#include <pthread.h>     // pthread_create
-#include <signal.h>      // sigaction
-#include <sys/utsname.h> // uname
-#include <time.h>        // localtime
-#include <getopt.h>      // getopt_long
+#include <sys/types.h>       // open, waitpid
+#include <sys/stat.h>        // open
+#include <fcntl.h>           // open, access
+#include <termios.h>         // tcsetattr
+#include <sys/ioctl.h>       // ioctl
+#include <sys/time.h>        // gettimeofday
+#ifdef __HAIKU__
+# include <posix/sys/wait.h> // waitpid
+#else
+# include <sys/wait.h>       // waitpid
+#endif
+#include <libgen.h>          // dirname
+#include <stdio.h>           // printf, ...
+#include <unistd.h>          // read, write, usleep, ...
+#include <string.h>          // strlen, memset, ...
+#include <stdlib.h>          // exit, free, getpt, ...
+#include <errno.h>           // errno
+#include <pthread.h>         // pthread_create
+#include <signal.h>          // sigaction
+#include <sys/utsname.h>     // uname
+#include <time.h>            // localtime
+#include <getopt.h>          // getopt_long
 
 #include "configure.h"
 #include "ttyrec.h"
@@ -104,23 +108,34 @@
 #endif
 
 #if defined(__linux__)
-# define LINUX_OS
 # define OS_STR    "Linux"
-#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
-# define BSD_OS
+#elif defined(__FreeBSD__)
+# define OS_STR    "FreeBSD"
+#elif defined(__NetBSD__)
+# define OS_STR    "NetBSD"
+#elif defined(__OpenBSD__)
+# define OS_STR    "OpenBSD"
+#elif defined(__DragonFly__)
+# define OS_STR    "DragonFlyBSD"
+#elif defined(__bsdi__)
 # define OS_STR    "BSD"
 #elif defined(__SVR4) || defined(__svr4__) || defined(sun) || defined(__sun)
 # define SUN_OS
 # define OS_STR    "SUN"
 #elif defined(macintosh) || defined(Macintosh) || (defined(__APPLE__) && defined(__MACH__))
-# define MAC_OS
-# define OS_STR    "MacOS"
+# define OS_STR    "Darwin"
+#elif defined(__HAIKU__)
+# define OS_STR    "Haiku"
 #else
 # define OS_STR    "UnknownOS"
 #endif
 
 #ifdef HAVE_isastream
 # include <stropts.h>
+#endif
+
+#ifdef SUN_OS
+# include <sys/termios.h>
 #endif
 
 #ifdef SUN_OS
@@ -792,7 +807,14 @@ void doinput(void)
     {
         print_termios_info(master, "parent master in doinput");
 
-        while ((cc = read(0, ibuf, BUFSIZ)) > 0)
+#ifdef __HAIKU__
+// under Haiku, if we use BUFSIZ as read size, it reads 4 bytes per 4 bytes
+// instead of returning read data as soon as possible
+# define READSZ    1
+#else
+# define READSZ    BUFSIZ
+#endif
+        while ((cc = read(0, ibuf, READSZ)) > 0)
         {
             printdbg2("[in:%d]", cc);
             if (!locked_since)
@@ -827,7 +849,7 @@ void doinput(void)
     }
 
     printdbg("%s("PID_T_FORMAT "): end doinput, waiting for child\r\n", me, getpid());
-    wait3(&childexit, 0, 0);
+    waitpid(-1, &childexit, 0);
 
     printdbg("%s("PID_T_FORMAT "): end doinput, child exited with status=%d, exiting too\r\n", me, getpid(), childexit);
     done(childexit);
@@ -837,20 +859,20 @@ void doinput(void)
 // handler of SIGCHLD
 void finish(int signal)
 {
-    int waitpid;
+    int waitedpid;
     int die = 0;
 
     (void)signal;
-    printdbg("%s("PID_T_FORMAT "): got SIGCHLD, calling wait3\r\n", me, getpid());
+    printdbg("%s("PID_T_FORMAT "): got SIGCHLD, calling waitpid\r\n", me, getpid());
 
-    while ((waitpid = wait3(&childexit, WNOHANG, 0)) > 0)
+    while ((waitedpid = waitpid(-1, &childexit, WNOHANG)) > 0)
     {
-        if (waitpid == subchild)
+        if (waitedpid == subchild)
         {
             printdbg("%s("PID_T_FORMAT "): subchild exited with %d, setting can_exit to 1\r\n", me, getpid(), childexit);
             can_exit = 1;
         }
-        else if (waitpid == child)
+        else if (waitedpid == child)
         {
             printdbg("%s("PID_T_FORMAT "): child exited with %d, exiting too\r\n", me, getpid(), childexit);
             die = 1;
@@ -911,7 +933,7 @@ void set_ttyrec_file_name(char **nameptr)
         (*nameptr)[BUFSIZ - 5] = '\0';
 
         char usec[7];
-        if (snprintf(usec, 7, "%06lu", tv.tv_usec) < 0)
+        if (snprintf(usec, 7, "%06lu", (unsigned long)tv.tv_usec) < 0)
         {
             perror("snprintf()");
             free(*nameptr);
@@ -1141,7 +1163,7 @@ void dooutput(void)
 {
     int                cc;
     char               obuf[BUFSIZ];
-    int                waitpid;
+    int                waitedpid;
     unsigned long long bytes_out          = 0;
     int                stdout_pipe_opened = 1;
     int                stderr_pipe_opened = 1;
@@ -1318,8 +1340,8 @@ void dooutput(void)
 
     while (can_exit == 0)
     {
-        waitpid = wait3(&childexit, 0, 0);
-        if (waitpid < 0) // oops, all our children are already dead (ECHILD)
+        waitedpid = waitpid(-1, &childexit, 0);
+        if (waitedpid < 0) // oops, all our children are already dead (ECHILD)
         {
             printdbg("child: oops, subchild is already dead!\r\n");
             can_exit = 1;
@@ -1518,8 +1540,14 @@ void getmaster(void)
         printdbg("fixing master pty attrs\r\n");
         mastert.c_iflag = IXON + ICRNL;  // 02400
         mastert.c_oflag = OPOST + ONLCR; // 05
-        mastert.c_cflag = 0277;          //B38400 + CSIZE + CREAD;
-        mastert.c_lflag = ISIG + ICANON + ECHO + ECHOE + ECHOK + ECHOKE + ECHOCTL + IEXTEN;
+        mastert.c_cflag = 0277;          //B38400 + CS8 + CREAD;
+        mastert.c_lflag = ISIG + ICANON + ECHO + ECHOE + ECHOK + IEXTEN;
+#ifdef ECHOKE                            /* undef under NetBSD */
+        mastert.c_lflag += ECHOKE;
+#endif
+#ifdef ECHOCTL                           /* undef under NetBSD */
+        mastert.c_lflag += ECHOCTL;
+#endif
         // apply the c_cc config of a classic pseudotty given by posix_openpt()
         mastert.c_cc[VINTR]  = 3;
         mastert.c_cc[VQUIT]  = 28;
@@ -1531,14 +1559,22 @@ void getmaster(void)
 #ifdef VSWTC /* not defined under at least OmniOS */
         mastert.c_cc[VSWTC] = 0;
 #endif
-        mastert.c_cc[VSTART]   = 17;
-        mastert.c_cc[VSTOP]    = 19;
-        mastert.c_cc[VSUSP]    = 26;
-        mastert.c_cc[VEOL]     = 0;
+        mastert.c_cc[VSTART] = 17;
+        mastert.c_cc[VSTOP]  = 19;
+        mastert.c_cc[VSUSP]  = 26;
+        mastert.c_cc[VEOL]   = 0;
+#ifdef VREPRINT /* not defined under at least Haiku */
         mastert.c_cc[VREPRINT] = 18;
+#endif
+#ifdef VDISCARD /* not defined under at least Haiku */
         mastert.c_cc[VDISCARD] = 15;
-        mastert.c_cc[VWERASE]  = 23;
-        mastert.c_cc[VLNEXT]   = 22;
+#endif
+#ifdef VWERASE  /* not defined under at least Haiku */
+        mastert.c_cc[VWERASE] = 23;
+#endif
+#ifdef VLNEXT   /* not defined under at least Haiku */
+        mastert.c_cc[VLNEXT] = 22;
+#endif
 
         print_termios_info(master, "termios master before fix");
         if (tcsetattr(master, TCSANOW, &mastert))
@@ -1742,7 +1778,7 @@ void print_termios_info(int fd, const char *prefix)
         {
             char dbgline[BUFSIZ];
             dbgline[0] = '\0';
-            snprintf(dbgline, BUFSIZ, "%25s: i=%05o o=%03o c=%05o l=%06o, i: ", prefix, t.c_iflag, t.c_oflag, t.c_cflag, t.c_lflag);
+            snprintf(dbgline, BUFSIZ, "%25s: i=%05lo o=%03lo c=%05lo l=%06lo, i: ", prefix, (unsigned long)t.c_iflag, (unsigned long)t.c_oflag, (unsigned long)t.c_cflag, (unsigned long)t.c_lflag);
 #define IFLAG(f)                                                                                \
     if (t.c_iflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); \
     }
@@ -1762,20 +1798,34 @@ case f:            \
             IFLAG(INLCR);
             IFLAG(IGNCR);
             IFLAG(ICRNL);
+#ifdef IUCLC /* undef under NetBSD */
             IFLAG(IUCLC);
+#endif
             IFLAG(IXON);
+#ifdef IXANY /* undef under NetBSD */
             IFLAG(IXANY);
+#endif
             IFLAG(IXOFF);
+#ifdef IMAXBEL /* undef at least under Haiku */
             IFLAG(IMAXBEL);
+#endif
+#ifdef IUTF8
             IFLAG(IUTF8);
+#endif
             strncat(dbgline + strlen(dbgline), "o: ", BUFSIZ - strlen(dbgline));
             OFLAG(OPOST);
+#ifdef OLCUC /* undef under NetBSD */
             OFLAG(OLCUC);
+#endif
             OFLAG(ONLCR);
             OFLAG(OCRNL);
             OFLAG(ONLRET);
+#ifdef OFILL /* undef under NetBSD */
             OFLAG(OFILL);
+#endif
+#ifdef OFDEL /* undef under NetBSD */
             OFLAG(OFDEL);
+#endif
             strncat(dbgline + strlen(dbgline), "c: ", BUFSIZ - strlen(dbgline));
             switch (t.c_cflag & B38400)
             {
@@ -1792,12 +1842,16 @@ case f:            \
                 CSWITCH(B50);
                 CSWITCH(B0);
             }
-            switch (t.c_cflag & CS8)
+            switch (t.c_cflag & CSIZE)
             {
                 CSWITCH(CS8);
                 CSWITCH(CS7);
+#if (CS6 != CS5) && (CS6 != CS7) && (CS6 != CS8) /* Haiku defines CS4 and CS5 to 0x00 */
                 CSWITCH(CS6);
+#endif
+#if (CS5 != CS6) && (CS5 != CS7) && (CS5 != CS8)
                 CSWITCH(CS5);
+#endif
             }
             CFLAG(CSTOPB);
             CFLAG(CREAD);
@@ -1807,18 +1861,30 @@ case f:            \
             strncat(dbgline + strlen(dbgline), "l: ", BUFSIZ - strlen(dbgline));
             LFLAG(ISIG);
             LFLAG(ICANON);
+#ifdef XCASE /* undef under NetBSD */
             LFLAG(XCASE);
+#endif
             LFLAG(ECHO);
             LFLAG(ECHOE);
             LFLAG(ECHOK);
             LFLAG(ECHONL);
             LFLAG(NOFLSH);
             LFLAG(TOSTOP);
+#ifdef ECHOCTL /* undef under NetBSD */
             LFLAG(ECHOCTL);
+#endif
+#ifdef ECHOPRT /* undef under NetBSD */
             LFLAG(ECHOPRT);
+#endif
+#ifdef ECHOKE  /* undef under NetBSD */
             LFLAG(ECHOKE);
+#endif
+#ifdef FLUSH0  /* undef under NetBSD */
             LFLAG(FLUSHO);
+#endif
+#ifdef PENDIN  /* undef under NetBSD */
             LFLAG(PENDIN);
+#endif
             LFLAG(IEXTEN);
 #undef IFLAG
 #undef OFLAG

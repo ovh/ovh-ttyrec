@@ -1,5 +1,5 @@
 CC = %CC%
-CFLAGS = -O2 -D_GNU_SOURCE -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -std=gnu99 -I/usr/local/include %CFLAGS%
+CFLAGS = -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS%
 LDFLAGS = -L/usr/local/lib
 LDLIBS = %LDLIBS%
 
@@ -13,7 +13,7 @@ deb:
 	dpkg-buildpackage -b -rfakeroot -us -uc
 
 ttyrec: ttyrec.o io.o compress.o %COMPRESS_ZSTD%
-	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS) -pthread
+	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS) %PTHREAD%
 
 ttyplay: ttyplay.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttyplay.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
