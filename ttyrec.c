@@ -206,6 +206,8 @@ static const char *ansi_restorecursor = "\0338";
 
 static time_t last_activity = 0;
 static time_t locked_since  = 0;
+static int    lock_warned   = 0;
+static int    kill_warned   = 0;
 
 static const char version[] = "1.1.5.0";
 
@@ -224,12 +226,14 @@ int stderr_pipe[2];         // subchild will write to it, child will read from i
 static int master;
 static int slave;
 
-static char *fname       = NULL;
-static char *dname       = NULL;
-static char *uuid        = NULL;
-static char *namefmt     = NULL;
-static long timeout_lock = 0;
-static long timeout_kill = 0;
+static char *fname                   = NULL;
+static char *dname                   = NULL;
+static char *uuid                    = NULL;
+static char *namefmt                 = NULL;
+static long timeout_lock             = 0;
+static long timeout_kill             = 0;
+static long warn_before_lock_seconds = 0;
+static long warn_before_kill_seconds = 0;
 
 static struct termios parent_stdin_termios;
 static struct winsize parent_stdin_winsize;
@@ -269,28 +273,30 @@ int main(int argc, char **argv)
     {
         static struct option long_options[] =
         {
-            { "zstd",           0, 0, 'Z' },
-            { "level",          1, 0, 'l' },
-            { "verbose",        0, 0, 'v' },
-            { "append",         0, 0, 'a' },
-            { "cheatcodes",     0, 0, 'c' },
-            { "no-cheatcodes",  0, 0, 'C' },
-            { "shell-cmd",      1, 0, 'e' },
-            { "dir",            1, 0, 'd' },
-            { "output",         1, 0, 'f' },
-            { "uuid",           1, 0, 'z' },
-            { "no-openpty",     0, 0, 'p' },
-            { "lock-timeout",   1, 0, 'l' },
-            { "kill-timeout",   1, 0, 'k' },
-            { "msg",            1, 0, 's' },
-            { "count-bytes",    0, 0, 'n' },
-            { "term",           1, 0, 'T' },
-            { "version",        0, 0, 'V' },
-            { "help",           0, 0, 'h' },
-            { "zstd-try",       0, 0, 0   },
-            { "max-flush-time", 1, 0, 0   },
-            { "name-format",    1, 0, 'F' },
-            { 0,                0, 0, 0   }
+            { "zstd",             0, 0, 'Z' },
+            { "level",            1, 0, 'l' },
+            { "verbose",          0, 0, 'v' },
+            { "append",           0, 0, 'a' },
+            { "cheatcodes",       0, 0, 'c' },
+            { "no-cheatcodes",    0, 0, 'C' },
+            { "shell-cmd",        1, 0, 'e' },
+            { "dir",              1, 0, 'd' },
+            { "output",           1, 0, 'f' },
+            { "uuid",             1, 0, 'z' },
+            { "no-openpty",       0, 0, 'p' },
+            { "lock-timeout",     1, 0, 'l' },
+            { "kill-timeout",     1, 0, 'k' },
+            { "msg",              1, 0, 's' },
+            { "count-bytes",      0, 0, 'n' },
+            { "term",             1, 0, 'T' },
+            { "version",          0, 0, 'V' },
+            { "help",             0, 0, 'h' },
+            { "zstd-try",         0, 0, 0   },
+            { "max-flush-time",   1, 0, 0   },
+            { "name-format",      1, 0, 'F' },
+            { "warn-before-lock", 1, 0, 0   },
+            { "warn-before-kill", 1, 0, 0   },
+            { 0,                  0, 0, 0   }
         };
         int option_index = 0;
         ch = getopt_long(argc, argv, "ZcCupVhvanf:z:d:t:T:k:s:e:l:F:", long_options, &option_index);
@@ -323,6 +329,28 @@ int main(int argc, char **argv)
                 }
                 zstd_set_max_flush(max_flush_seconds);
 #endif
+            }
+            else if (strcmp(long_options[option_index].name, "warn-before-lock") == 0)
+            {
+                errno = 0;
+                warn_before_lock_seconds = strtol(optarg, NULL, 10);
+                if ((errno != 0) || (warn_before_lock_seconds <= 0))
+                {
+                    help();
+                    fprintf(stderr, "Invalid value passed to --%s (%s), expected a strictly positive integer\r\n", long_options[option_index].name, optarg);
+                    exit(EXIT_FAILURE);
+                }
+            }
+            else if (strcmp(long_options[option_index].name, "warn-before-kill") == 0)
+            {
+                errno = 0;
+                warn_before_kill_seconds = strtol(optarg, NULL, 10);
+                if ((errno != 0) || (warn_before_kill_seconds <= 0))
+                {
+                    help();
+                    fprintf(stderr, "Invalid value passed to --%s (%s), expected a strictly positive integer\r\n", long_options[option_index].name, optarg);
+                    exit(EXIT_FAILURE);
+                }
             }
             else
             {
@@ -518,6 +546,34 @@ int main(int argc, char **argv)
     {
         help();
         fprintf(stderr, "specified timeout_lock (%ld) is higher than timeout_kill (%ld), this doesn't make sense\r\n", timeout_lock, timeout_kill);
+        exit(EXIT_FAILURE);
+    }
+
+    if ((warn_before_lock_seconds > 0) && (timeout_lock == 0))
+    {
+        help();
+        fprintf(stderr, "You specified --warn-before-lock without enabling --timeout-lock, this doesn't make sense\r\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (warn_before_lock_seconds > timeout_lock)
+    {
+        help();
+        fprintf(stderr, "The specified value for --warn-before-lock is higher than --timeout-lock, this doesn't make sense\r\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if ((warn_before_kill_seconds > 0) && (timeout_kill == 0))
+    {
+        help();
+        fprintf(stderr, "You specified --warn-before-kill without enabling --timeout-kill, this doesn't make sense\r\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (warn_before_kill_seconds > timeout_kill)
+    {
+        help();
+        fprintf(stderr, "The specified value for --warn-before-kill is higher than --timeout-kill, this doesn't make sense\r\n");
         exit(EXIT_FAILURE);
     }
 
@@ -802,6 +858,8 @@ void doinput(void)
         fail();
     }
     last_activity = time(NULL);
+    lock_warned   = 0;
+    kill_warned   = 0;
 
     if (use_tty)
     {
@@ -825,6 +883,8 @@ void doinput(void)
                     fail();
                 }
                 last_activity = time(NULL);
+                lock_warned   = 0;
+                kill_warned   = 0;
                 if (cc == 1)
                 {
                     handle_cheatcodes(ibuf[0]);
@@ -983,6 +1043,8 @@ void swing_output_file(int signal)
 void unlock_session(int signal)
 {
     last_activity = time(NULL);
+    lock_warned   = 0;
+    kill_warned   = 0;
     // to avoid signal storm, abort if not locked
     if (!locked_since)
     {
@@ -1129,10 +1191,17 @@ void *timeout_watcher(void *arg)
     for ( ; ; )
     {
         sleep(1);
-        // handle lock: if input is idle, and we have a pseudotty, lock
-        if ((timeout_lock > 0) && use_tty)
+        time_t now = time(NULL);
+        if (use_tty && !locked_since)
         {
-            if (!locked_since && (time(NULL) - last_activity > timeout_lock))
+            // handle warn: if input is idle and we didn't already, warn
+            if ((warn_before_lock_seconds > 0) && (lock_warned == 0) && (now - last_activity + warn_before_lock_seconds > timeout_lock))
+            {
+                lock_warned = 1;
+                fprintf(stderr, "warning: your session will be locked in %lu seconds if no input activity is detected.", warn_before_lock_seconds);
+            }
+            // handle lock: if input is idle, and warn wasn't enough, lock
+            if ((timeout_lock > 0) && (now - last_activity > timeout_lock))
             {
                 printdbg("parent: timeout_watcher: do_lock()\r\n");
                 do_lock();
@@ -1142,16 +1211,32 @@ void *timeout_watcher(void *arg)
         if (timeout_kill > 0)
         {
             // if we're locked, check against the locked_since (never happens if !use_tty)
-            if (locked_since && (time(NULL) - locked_since > timeout_kill - timeout_lock))
+            if (locked_since)
             {
-                printdbg("parent: timeout_watcher: kill (locked)\r\n");
-                kill(child, SIGTERM);
+                if ((warn_before_kill_seconds > 0) && (kill_warned == 0) && (now - locked_since > timeout_kill - timeout_lock - warn_before_kill_seconds))
+                {
+                    kill_warned = 1;
+                    fprintf(stderr, "warning: your session will be killed in %lu seconds if no input activity is detected.", warn_before_kill_seconds);
+                }
+                else if (now - locked_since > timeout_kill - timeout_lock)
+                {
+                    printdbg("parent: timeout_watcher: kill (locked)\r\n");
+                    kill(child, SIGTERM);
+                }
             }
             // handle kill cont'd: if we're not locked, check against the last_activity
-            if (!locked_since && (time(NULL) - last_activity > timeout_kill))
+            else
             {
-                printdbg("parent: timeout_watcher: kill (unlocked), now=%d last_activity=%d timeout_kill=%ld\r\n", (int)time(NULL), (int)last_activity, timeout_kill);
-                kill(child, SIGTERM);
+                if (now - last_activity > timeout_kill - warn_before_kill_seconds)
+                {
+                    kill_warned = 1;
+                    fprintf(stderr, "warning: your session will be killed in %lu seconds if no input activity is detected.", warn_before_kill_seconds);
+                }
+                else if (now - last_activity > timeout_kill)
+                {
+                    printdbg("parent: timeout_watcher: kill (unlocked), now=%d last_activity=%d timeout_kill=%ld\r\n", (int)now, (int)last_activity, timeout_kill);
+                    kill(child, SIGTERM);
+                }
             }
         }
     }
@@ -1333,6 +1418,8 @@ void dooutput(void)
             (void)fwrite_wrapper(obuf, 1, cc, fscript);
             bytes_out    += cc;
             last_activity = time(NULL);
+            lock_warned   = 0;
+            kill_warned   = 0;
         }
     }
 
@@ -1904,57 +1991,64 @@ case f:            \
 
 void help(void)
 {
-    fprintf(stderr,                                                                                                                           \
-            "Usage: ttyrec [options] -- <command> [command options]\n"                                                                        \
-            "\n"                                                                                                                              \
-            "Usage (legacy compatibility mode): ttyrec -e <command> [options] [ttyrec file name]\n"                                           \
-            "\n"                                                                                                                              \
-            "Options:\n"                                                                                                                      \
-            "  -z, --uuid UUID         specify an UUID (can be any string) that will appear in the ttyrec output file names,\n"               \
-            "                            and kept with SIGUSR1 rotations (default: own PID)\n"                                                \
-            "  -f, --output FILE       full path of the first ttyrec file to write to (autogenerated if omitted)\n"                           \
-            "  -d, --dir FOLDER        folder where to write the ttyrec files (taken from -f if omitted,\n"                                   \
-            "                            defaulting to working directory if both -f and -d are omitted)\n"                                    \
-            "  -F, --name-format FMT   custom strftime-compatible format string to qualify the full path of the output files,\n"              \
-            "                            including the SIGUSR1 rotated ones\n"                                                                \
-            "  -a, --append            open the ttyrec output file in append mode instead of write-clobber mode\n"                            \
-            "  -Z, --zstd              enable on-the-fly compression of output file using zstd,\n"                                            \
-            "                            the resulting file will have a '.ttyrec.zst' extension\n"                                            \
-            "      --zstd-try          enable on-the-fly zstd compression, silently fallback to no compression if not available\n"            \
-            "      --max-flush-time S  specify the maximum number of seconds after which we'll force zstd to flush its output buffers\n"      \
-            "                            to ensure that even somewhat quiet sessions gets regularly written out to disk, default is %d\n"     \
-            "  -l, --level LEVEL       set compression level, must be between 1 and 19 for zstd, default is 3\n"                              \
-            "  -n, --count-bytes       count the number of bytes out and print it on termination (experimental)\n"                            \
-            "  -t, --lock-timeout S    lock session on input timeout after S seconds\n"                                                       \
-            "  -k, --kill-timeout S    kill session on input timeout after S seconds\n"                                                       \
-            "  -C, --no-cheatcodes     disable cheat-codes (see below), this is the default\n"                                                \
-            "  -c, --cheatcodes        enable cheat-codes (see below)\n"                                                                      \
-            "  -p, --no-openpty        don't use openpty() even when it's available\n"                                                        \
-            "  -T, --term MODE         MODE can be either 'never' (never allocate a pseudotty, even if stdin is a tty, and use pipes to\n"    \
-            "                            handle stdout/stderr instead), 'always' (always allocate a pseudotty, even if stdin is not a tty)\n" \
-            "                            or 'auto' (default, allocate a pseudotty if stdin is a tty, uses pipes otherwise)\n"                 \
-            "  -v, --verbose           verbose (debug) mode, use twice for more verbosity\n"                                                  \
-            "  -V, --version           show version information\n"                                                                            \
-            "  -e, --shell-cmd CMD     enables legacy compatibility mode and specifies the command to be run under the user's $SHELL -c\n"    \
-            "\n"                                                                                                                              \
-            "Examples:\n"                                                                                                                     \
-            "  Run some shell commands in legacy mode: ttyrec -e 'for i in a b c; do echo $i; done' outfile.ttyrec\n"                         \
-            "  Run some shell commands in normal mode: ttyrec -f /tmp/normal.ttyrec -- sh -c 'for i in a b c; do echo $i; done'\n"            \
-            "  Connect to a remote machine interactively: ttyrec -t 60 -k 300 -- ssh remoteserver\n"                                          \
-            "  Execute a local script remotely with the default remote shell: ttyrec -- ssh remoteserver < script.sh\n"                       \
-            "  Record a screen session: ttyrec screen\n"                                                                                      \
-            "\n"                                                                                                                              \
-            "Handled signals:\n"                                                                                                              \
-            "  SIGUSR1     close current ttyrec file and reopen a new one (log rotation)\n"                                                   \
-            "  SIGURG      lock session\n"                                                                                                    \
-            "  SIGUSR2     unlock session\n"                                                                                                  \
-            "\n"                                                                                                                              \
-            "Cheat-codes (magic keystrokes combinations):\n"                                                                                  \
-            "  ^L^L^L^L^L^L^L^L   lock your session (that's 8 CTRL+L's)\n"                                                                    \
-            "  ^K^I^L^L^K^I^L^L   kill your session\n"                                                                                        \
-            "\n"                                                                                                                              \
-            "Remark about session lock and session kill:\n"                                                                                   \
-            "  If we don't have a tty, we can't lock, so -t will be ignored,\n"                                                               \
-            "  whereas -k will be applied without warning, as there's no tty to output a warning to.\n"                                       \
-            "\n", ZSTD_MAX_FLUSH_SECONDS_DEFAULT);
+    fprintf(stderr,                                                                                                                \
+            "Usage: ttyrec [options] -- <command> [command options]\n"                                                             \
+            "\n"                                                                                                                   \
+            "Usage (legacy compatibility mode): ttyrec -e <command> [options] [ttyrec file name]\n"                                \
+            "\n"                                                                                                                   \
+            "Options:\n"                                                                                                           \
+            "  -z, --uuid UUID           specify an UUID (can be any string) that will appear in the ttyrec output file names,\n"  \
+            "                              and kept with SIGUSR1 rotations (default: own PID)\n"                                   \
+            "  -f, --output FILE         full path of the first ttyrec file to write to (autogenerated if omitted)\n"              \
+            "  -d, --dir FOLDER          folder where to write the ttyrec files (taken from -f if omitted,\n"                      \
+            "                              defaulting to working directory if both -f and -d are omitted)\n"                       \
+            "  -F, --name-format FMT     custom strftime-compatible format string to qualify the full path of the output files,\n" \
+            "                              including the SIGUSR1 rotated ones\n"                                                   \
+            "  -a, --append              open the ttyrec output file in append mode instead of write-clobber mode\n");
+#ifdef HAVE_zstd
+    fprintf(stderr,                                                                                                                         \
+            "  -Z, --zstd                enable on-the-fly compression of output file using zstd,\n"                                        \
+            "                              the resulting file will have a '.ttyrec.zst' extension\n"                                        \
+            "      --zstd-try            enable on-the-fly zstd compression, silently fallback to no compression if not available\n"        \
+            "      --max-flush-time S    specify the maximum number of seconds after which we'll force zstd to flush its output buffers\n"  \
+            "                              to ensure that even somewhat quiet sessions gets regularly written out to disk, default is %d\n" \
+            "  -l, --level LEVEL         set compression level, must be between 1 and 19 for zstd, default is 3\n"                          \
+            , ZSTD_MAX_FLUSH_SECONDS_DEFAULT);
+#endif
+    fprintf(stderr,                                                                                                                             \
+            "  -n, --count-bytes         count the number of bytes out and print it on termination (experimental)\n"                            \
+            "  -t, --lock-timeout S      lock session on input timeout after S seconds\n"                                                       \
+            "      --warn-before-lock S  warn S seconds before locking (see --lock-timeout)\n"                                                  \
+            "  -k, --kill-timeout S      kill session on input timeout after S seconds\n"                                                       \
+            "      --warn-before-kill S  warn S seconds before killing (see --kill-timeout)\n"                                                  \
+            "  -C, --no-cheatcodes       disable cheat-codes (see below), this is the default\n"                                                \
+            "  -c, --cheatcodes          enable cheat-codes (see below)\n"                                                                      \
+            "  -p, --no-openpty          don't use openpty() even when it's available\n"                                                        \
+            "  -T, --term MODE           MODE can be either 'never' (never allocate a pseudotty, even if stdin is a tty, and use pipes to\n"    \
+            "                              handle stdout/stderr instead), 'always' (always allocate a pseudotty, even if stdin is not a tty)\n" \
+            "                              or 'auto' (default, allocate a pseudotty if stdin is a tty, uses pipes otherwise)\n"                 \
+            "  -v, --verbose             verbose (debug) mode, use twice for more verbosity\n"                                                  \
+            "  -V, --version             show version information\n"                                                                            \
+            "  -e, --shell-cmd CMD       enables legacy compatibility mode and specifies the command to be run under the user's $SHELL -c\n"    \
+            "\n"                                                                                                                                \
+            "Examples:\n"                                                                                                                       \
+            "  Run some shell commands in legacy mode: ttyrec -e 'for i in a b c; do echo $i; done' outfile.ttyrec\n"                           \
+            "  Run some shell commands in normal mode: ttyrec -f /tmp/normal.ttyrec -- sh -c 'for i in a b c; do echo $i; done'\n"              \
+            "  Connect to a remote machine interactively: ttyrec -t 60 -k 300 -- ssh remoteserver\n"                                            \
+            "  Execute a local script remotely with the default remote shell: ttyrec -- ssh remoteserver < script.sh\n"                         \
+            "  Record a screen session: ttyrec screen\n"                                                                                        \
+            "\n"                                                                                                                                \
+            "Handled signals:\n"                                                                                                                \
+            "  SIGUSR1     close current ttyrec file and reopen a new one (log rotation)\n"                                                     \
+            "  SIGURG      lock session\n"                                                                                                      \
+            "  SIGUSR2     unlock session\n"                                                                                                    \
+            "\n"                                                                                                                                \
+            "Cheat-codes (magic keystrokes combinations):\n"                                                                                    \
+            "  ^L^L^L^L^L^L^L^L   lock your session (that's 8 CTRL+L's)\n"                                                                      \
+            "  ^K^I^L^L^K^I^L^L   kill your session\n"                                                                                          \
+            "\n"                                                                                                                                \
+            "Remark about session lock and session kill:\n"                                                                                     \
+            "  If we don't have a tty, we can't lock, so -t will be ignored,\n"                                                                 \
+            "  whereas -k will be applied without warning, as there's no tty to output a warning to.\n"                                         \
+            );
 }
