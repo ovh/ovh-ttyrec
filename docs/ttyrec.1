@@ -47,11 +47,14 @@ count the number of bytes out and print it on termination (experimental)
 \fB\-t\fR, \fB\-\-lock\-timeout\fR S
 lock session on input timeout after S seconds
 .TP
+\fB\-\-warn\-before\-lock\fR S
+warn S seconds before locking (see \fB\-\-lock\-timeout\fR)
+.TP
 \fB\-k\fR, \fB\-\-kill\-timeout\fR S
 kill session on input timeout after S seconds
 .TP
-\fB\-\-warn\-before\-lock\fR S
-warn S seconds before locking (see \fB\-\-lock\-timeout\fR)
+\fB\-\-warn\-before\-kill\fR S
+warn S seconds before killing (see \fB\-\-kill\-timeout\fR)
 .TP
 \fB\-C\fR, \fB\-\-no\-cheatcodes\fR
 disable cheat\-codes (see below), this is the default
