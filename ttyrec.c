@@ -188,6 +188,7 @@ void unlock_session(int signal);
 void lock_session(int signal);
 void finish(int signal);
 void sigterm_handler(int signal);
+void sighup_handler(int signal);
 
 // other functions used by parent and child
 void done(int status);
@@ -688,6 +689,16 @@ int main(int argc, char **argv)
         act.sa_handler = &sigterm_handler;
         act.sa_flags   = SA_RESTART;
         if (sigaction(SIGTERM, &act, NULL))
+        {
+            perror("sigaction");
+            exit(EXIT_FAILURE);
+        }
+
+        // we can get SIGHUP is our tty is closed, fclose() properly in that case
+        memset(&act, '\0', sizeof(act));
+        act.sa_handler = &sighup_handler;
+        act.sa_flags   = SA_RESTART;
+        if (sigaction(SIGHUP, &act, NULL))
         {
             perror("sigaction");
             exit(EXIT_FAILURE);
@@ -1521,6 +1532,16 @@ void sigterm_handler(int signal)
     done(EXIT_SUCCESS);
 }
 
+
+void sighup_handler(int signal)
+{
+    (void)signal;
+    if (subchild > 0)
+    {
+        kill(subchild, SIGTERM);
+    }
+    done(EXIT_SUCCESS);
+}
 
 void done(int status)
 {
