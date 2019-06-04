@@ -192,6 +192,7 @@ int ttyread(FILE *fp, Header *h, char **buf)
     if (*buf == NULL)
     {
         perror("malloc");
+        return 1;
     }
 
     if (fread_wrapper(*buf, 1, h->len, fp) == 0)
@@ -327,9 +328,9 @@ int main(int argc, char **argv)
     while (1)
     {
 #ifdef HAVE_zstd
-        int ch = getopt(argc, argv, "s:npZ");
+        int ch = getopt(argc, argv, "hs:npZ");
 #else
-        int ch = getopt(argc, argv, "s:np");
+        int ch = getopt(argc, argv, "hs:np");
 #endif
         if (ch == EOF)
         {
@@ -360,6 +361,7 @@ int main(int argc, char **argv)
             break;
 #endif
 
+        case 'h':
         default:
             usage();
         }
