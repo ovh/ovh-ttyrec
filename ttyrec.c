@@ -411,6 +411,12 @@ int main(int argc, char **argv)
 
         // ttyrec classic way of specifying the command to launch, it uses sh -c
         case 'e':
+            if (legacy == 1)
+            {
+                help();
+                fprintf(stderr, "Option -e specified more than once.\r\n");
+                exit(EXIT_FAILURE);
+            }
             legacy    = 1;
             params    = malloc(sizeof(char *) * 4);
             command   = shell;
@@ -628,8 +634,10 @@ int main(int argc, char **argv)
     // if dname == ".", it might be because we've set it
     if (dname == NULL)
     {
+        char *tmpfname = strdup(fname);
         // strdup(dirname) because in done() we free() dname
-        dname = strdup(dirname(strdup(fname)));
+        dname = strdup(dirname(tmpfname));
+        free(tmpfname);
     }
 
     if (dname == NULL)
