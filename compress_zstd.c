@@ -91,7 +91,7 @@ size_t fwrite_wrapper_zstd(const void *ptr, size_t size, size_t nmemb, FILE *str
         //fprintf(stderr, "[zstd:rst]");
     }
     // otherwise, check for last sync time. if it's > X seconds, force zstd to flush its buffers
-    // and write to disk. we don't want to loose data from almost-idle sessions in case of server crash
+    // and write to disk. we don't want to lose data from almost-idle sessions in case of server crash
     else if (last_sync + zstd_max_flush_seconds < time(NULL))
     {
         ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
@@ -132,8 +132,8 @@ int fclose_wrapper_zstd(FILE *fp)
 size_t fread_wrapper_zstd(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     // input: compressed data read from file
-    // output: decompressed data from (a part of) buffin
-    // buffoutptr: pointing to decompressed not-yet-returned to caller data (remaining bytes is buffoutptrlen)
+    // output: decompressed data from (a part of) input.src
+    // buffOutPtr: pointing to decompressed not-yet-returned-to-caller data (remaining bytes is buffOutPtrLen)
 
     static ZSTD_inBuffer input = { NULL, 0, 0 };
 
@@ -193,7 +193,7 @@ DECOMPRESS:
     {
         output.pos  = 0;
         output.size = buffOutSize;
-        toRead      = ZSTD_decompressStream(dstream, &output, &input);      /* toRead : size of next compressed block */
+        toRead      = ZSTD_decompressStream(dstream, &output, &input);      /* toRead: size of next compressed block */
         if (ZSTD_isError(toRead))
         {
             fprintf(stderr, "ZSTD_decompressStream() error: %s\r\n", ZSTD_getErrorName(toRead));
@@ -203,7 +203,7 @@ DECOMPRESS:
         buffOutPtrLen = output.pos;
         if (buffOutPtrLen == 0)
         {
-            // ok this is an empty frame (or beggining of zst stream), read again
+            // ok this is an empty frame (or beginning of zst stream), read again
             goto DECOMPRESS;
         }
         goto GOTDATA;

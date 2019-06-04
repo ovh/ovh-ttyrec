@@ -297,6 +297,8 @@ int main(int argc, char **argv)
             { "name-format",      1, 0, 'F' },
             { "warn-before-lock", 1, 0, 0   },
             { "warn-before-kill", 1, 0, 0   },
+            { "help",             0, 0, 'h' },
+            { "usage",            0, 0, 'h' },
             { 0,                  0, 0, 0   }
         };
         int option_index = 0;
@@ -312,10 +314,10 @@ int main(int argc, char **argv)
         case 0:
             if (strcmp(long_options[option_index].name, "zstd-try") == 0)
             {
-#ifdef HAVE_zstd
-                opt_zstd++;
-                set_compress_mode(COMPRESS_ZSTD);
-#endif
+                if (set_compress_mode(COMPRESS_ZSTD) == 0)
+                {
+                    opt_zstd++;
+                }
             }
             else if (strcmp(long_options[option_index].name, "max-flush-time") == 0)
             {
@@ -362,13 +364,12 @@ int main(int argc, char **argv)
 
         // on-the-fly zstd compression
         case 'Z':
-#ifdef HAVE_zstd
+            if (set_compress_mode(COMPRESS_ZSTD) != 0)
+            {
+                fprintf(stderr, "zstd support has not been enabled at compile time.\r\n");
+                fail();
+            }
             opt_zstd++;
-            set_compress_mode(COMPRESS_ZSTD);
-#else
-            fprintf(stderr, "zstd support has not been enabled at compile time.\r\n");
-            fail();
-#endif
             break;
 
         // compression level of compression algorithm
@@ -702,7 +703,7 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        // we can get SIGHUP is our tty is closed, fclose() properly in that case
+        // we can get SIGHUP if our tty is closed, fclose() properly in that case
         memset(&act, '\0', sizeof(act));
         act.sa_handler = &sighup_handler;
         act.sa_flags   = SA_RESTART;
@@ -887,11 +888,11 @@ void doinput(void)
 #ifdef __HAIKU__
 // under Haiku, if we use BUFSIZ as read size, it reads 4 bytes per 4 bytes
 // instead of returning read data as soon as possible
-# define READSZ    1
+        const size_t readsz = 1;
 #else
-# define READSZ    BUFSIZ
+        const size_t readsz = BUFSIZ;
 #endif
-        while ((cc = read(0, ibuf, READSZ)) > 0)
+        while ((cc = read(0, ibuf, readsz)) > 0)
         {
             printdbg2("[in:%d]", cc);
             if (!locked_since)
@@ -1028,7 +1029,7 @@ void set_ttyrec_file_name(char **nameptr)
     }
     if (opt_zstd)
     {
-        // we can strcat safely becase we used BUFSIZ - 4 above
+        // we can strcat safely because we used BUFSIZ - 4 above
         strcat(*nameptr, ".zst");
     }
 }
@@ -1550,6 +1551,7 @@ void sighup_handler(int signal)
     }
     done(EXIT_SUCCESS);
 }
+
 
 void done(int status)
 {
