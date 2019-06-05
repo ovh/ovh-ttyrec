@@ -1,0 +1,5 @@
+language: c
+addons:
+  apt:
+    packages:
+      - help2man
