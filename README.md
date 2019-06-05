@@ -11,11 +11,11 @@ ovh-ttyrec is based (and compatible with) the original ttyrec, and can be used a
 
 Efforts have been made to ensure the code is portable. It is known to work under at least:
 
- - Linux (any version or flavor)
+ - Linux (all versions and distros)
  - BSD (known to work under at least FreeBSD, NetBSD, OpenBSD, DragonFlyBSD)
  - Darwin (macOS aka OS X aka Mac OS X)
  - Haiku (community OS compatible with BeOS)
- - OmniOS (community OS compatible with Solaris)
+ - OpenSolaris (known to work under at least OmniOS CE)
 
 It should work under any POSIX OS that support either `openpty()` or the `grantpt()`/`unlockpt() `mechanisms.
 

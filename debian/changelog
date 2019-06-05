@@ -1,3 +1,25 @@
+ovh-ttyrec (1.1.6.0) master; urgency=medium
+
+  * feat: added generic fread/fwrite/fclose wrappers as a framework to support several (de)compression algorithms
+  * feat: add zstd support to ttyrec and ttyplay
+        ttyrec: add -Z option to enable on-the-fly compression if available
+        ttyrec: add --zstd to force on-the-fly zstd compression
+        ttyrec: add -l option to fine-tune the zstd compression ratio (between 1 and 19, default 3)
+        ttyrec: add --max-flush-time to specify a number of seconds after which we force zstd to flush
+          its output buffers to ensure somewhat idle sessions still get flushed to disk regularly
+        ttyplay: zstd decompression is automatically enabled if the file suffix is ".zst"
+        ttyplay: add -Z option to force on-the-fly zstd decompression regardless of the file suffix
+        ttytime: add a warning if timing a .zst file is attempted (not supported)
+  * feat: implement long-options parsing for ttyrec
+  * feat: add --name-format (-F) to specify a custom file name compatible with strftime()
+  * feat: add --warn-before-lock and --warn-before-kill options
+  * fix: abort if doinput() can't write to master
+  * chore: nicify termios debug output
+  * chore: get rid of help2man requirement
+  * chore: portability fixes, tested under Linux, FreeBSD, NetBSD, OpenBSD, DragonFlyBSD, Darwin, Haiku, OmniOS
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Tue, 04 Jun 2019 10:17:11 +0200
+
 ovh-ttyrec (1.1.5.0) master; urgency=medium
 
   * First public release
