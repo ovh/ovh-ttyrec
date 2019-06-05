@@ -75,9 +75,12 @@ if [ "$NO_ZSTD" != 1 ] && $CC $srcfile.c -L/usr/local/lib -I/usr/local/include -
     echo '#define HAVE_zstd' >>"$curdir/configure.h"
     COMPRESS_ZSTD='compress_zstd.o'
     printf "%b" "Checking whether we can link zstd statically... "
-    libzstda=$($CC -print-file-name=libzstd.a 2>/dev/null)
+    for dir in $($CC -print-search-dirs | awk '/^libraries:/ {$1=""; print}' | tr : "\n") /usr/local/lib
+    do
+        test -f "$dir/libzstd.a" && libzstda="$dir/libzstd.a"
+    done
     if [ -n "$libzstda" ] && [ -f "$libzstda" ] && [ "$NO_STATIC_ZSTD" != 1 ]; then
-        echo "yes"
+        echo "yes ($libzstda)"
         DEFINES_STR="$DEFINES_STR zstd[static]"
         LDLIBS="$LDLIBS $libzstda"
     else
@@ -210,7 +213,8 @@ fi
 echo "Checking for supported compiler options..."
 for w in -Wall -Wextra -pedantic -Wno-unused-result -Wbad-function-cast -Wmissing-declarations \
     -Wmissing-prototypes -Wnested-externs -Wold-style-definition -Wstrict-prototypes \
-    -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration -Wl,--as-needed
+    -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration -Wl,--as-needed \
+    -Wno-unused-command-line-argument
 do
     echo 'int main(void) { return 0; }' >$srcfile.c
     if [ $($CC $srcfile.c $w -o /dev/null 2>&1 | wc -l) = 0 ]; then
