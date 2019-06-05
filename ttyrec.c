@@ -274,7 +274,7 @@ int main(int argc, char **argv)
     {
         static struct option long_options[] =
         {
-            { "zstd",             0, 0, 'Z' },
+            { "zstd",             0, 0, 0   },
             { "level",            1, 0, 'l' },
             { "verbose",          0, 0, 'v' },
             { "append",           0, 0, 'a' },
@@ -292,7 +292,6 @@ int main(int argc, char **argv)
             { "term",             1, 0, 'T' },
             { "version",          0, 0, 'V' },
             { "help",             0, 0, 'h' },
-            { "zstd-try",         0, 0, 0   },
             { "max-flush-time",   1, 0, 0   },
             { "name-format",      1, 0, 'F' },
             { "warn-before-lock", 1, 0, 0   },
@@ -312,12 +311,14 @@ int main(int argc, char **argv)
         {
         // long option without short-option counterpart
         case 0:
-            if (strcmp(long_options[option_index].name, "zstd-try") == 0)
+            if (strcmp(long_options[option_index].name, "zstd") == 0)
             {
-                if (set_compress_mode(COMPRESS_ZSTD) == 0)
+                if (set_compress_mode(COMPRESS_ZSTD) != 0)
                 {
-                    opt_zstd++;
+                    fprintf(stderr, "zstd support has not been enabled at compile time.\r\n");
+                    fail();
                 }
+                opt_zstd++;
             }
             else if (strcmp(long_options[option_index].name, "max-flush-time") == 0)
             {
@@ -364,12 +365,10 @@ int main(int argc, char **argv)
 
         // on-the-fly zstd compression
         case 'Z':
-            if (set_compress_mode(COMPRESS_ZSTD) != 0)
+            if (set_compress_mode(COMPRESS_ZSTD) == 0)
             {
-                fprintf(stderr, "zstd support has not been enabled at compile time.\r\n");
-                fail();
+                opt_zstd++;
             }
-            opt_zstd++;
             break;
 
         // compression level of compression algorithm
@@ -2038,9 +2037,9 @@ void help(void)
             "  -a, --append              open the ttyrec output file in append mode instead of write-clobber mode\n");
 #ifdef HAVE_zstd
     fprintf(stderr,                                                                                                                         \
-            "  -Z, --zstd                enable on-the-fly compression of output file using zstd,\n"                                        \
+            "  -Z                        enable on-the-fly compression if available, silently fallback to no compression if not\n"        \
+            "      --zstd                force on-the-fly compression of output file using zstd,\n"                                        \
             "                              the resulting file will have a '.ttyrec.zst' extension\n"                                        \
-            "      --zstd-try            enable on-the-fly zstd compression, silently fallback to no compression if not available\n"        \
             "      --max-flush-time S    specify the maximum number of seconds after which we'll force zstd to flush its output buffers\n"  \
             "                              to ensure that even somewhat quiet sessions gets regularly written out to disk, default is %d\n" \
             "  -l, --level LEVEL         set compression level, must be between 1 and 19 for zstd, default is 3\n"                          \
