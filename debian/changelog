@@ -1,3 +1,9 @@
+ovh-ttyrec (1.1.6.1) master; urgency=medium
+
+  * fix: allow usage of -f even if -F if specified
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Fri, 14 Jun 2019 12:41:54 +0200
+
 ovh-ttyrec (1.1.6.0) master; urgency=medium
 
   * feat: added generic fread/fwrite/fclose wrappers as a framework to support several (de)compression algorithms

@@ -210,7 +210,7 @@ static time_t locked_since  = 0;
 static int    lock_warned   = 0;
 static int    kill_warned   = 0;
 
-static const char version[] = "1.1.6.0";
+static const char version[] = "1.1.6.1";
 
 static FILE *fscript;
 static int  child;
@@ -537,9 +537,9 @@ int main(int argc, char **argv)
         printdbg("option %d: <%s>\r\n", i, argv[i]);
     }
 
-    if ((namefmt != NULL) && ((dname != NULL) || (fname != NULL) || (uuid != NULL)))
+    if ((namefmt != NULL) && ((dname != NULL) || (uuid != NULL)))
     {
-        fprintf(stderr, "Option -F (--name-format) can't be used with -d (--dir), -f (--output) or -z (--uuid)\n");
+        fprintf(stderr, "Option -F (--name-format) can't be used with -d (--dir) or -z (--uuid)\n");
         fail();
     }
 
