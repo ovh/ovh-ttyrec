@@ -630,6 +630,20 @@ int main(int argc, char **argv)
     {
         set_ttyrec_file_name(&fname);
     }
+    else
+    {
+        // otherwise, append .zst if applicable
+        if (opt_zstd)
+        {
+            fname = realloc(fname, strlen(fname) + 4 + 1);
+            if (fname == NULL)
+            {
+                perror("realloc");
+                exit(EXIT_FAILURE);
+            }
+            strcat(fname, ".zst");
+        }
+    }
 
     // if dname == ".", it might be because we've set it
     if (dname == NULL)
