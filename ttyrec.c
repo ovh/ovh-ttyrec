@@ -1581,10 +1581,9 @@ void done(int status)
         printdbg("parent: done, cleaning up and exiting with %d (child=%d subchild=%d)\r\n", WEXITSTATUS(status), child, subchild);
         if (use_tty && parent_stdin_isatty)
         {
-            if (tcsetattr(0, TCSAFLUSH, &parent_stdin_termios))
-            {
-                perror("parent: tcsetattr(0) in done()");
-            }
+            // don't check for result because if it fails, we can't do anything interesting,
+            // not even printing an error (and actually; perror() stucks sometimes if we use it here)
+            tcsetattr(0, TCSAFLUSH, &parent_stdin_termios);
         }
     }
 
