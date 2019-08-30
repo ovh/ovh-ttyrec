@@ -210,7 +210,7 @@ static time_t locked_since  = 0;
 static int    lock_warned   = 0;
 static int    kill_warned   = 0;
 
-static const char version[] = "1.1.6.1";
+static const char version[] = "1.1.6.2";
 
 static FILE *fscript;
 static int  child;
