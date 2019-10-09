@@ -1573,7 +1573,7 @@ void done(int status)
     // again, we end up doing double-frees and calling exit() twice, which gets us a segfault. Hereby, ensure
     // that once we've entered this function once, we'll never re-enter it through a sighandler.
     static pthread_mutex_t entered_done = PTHREAD_MUTEX_INITIALIZER;
-    if (!pthread_mutex_trylock(&entered_done))
+    if (pthread_mutex_trylock(&entered_done) != 0)
     {
         return;
     }
