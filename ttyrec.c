@@ -1260,7 +1260,7 @@ void *timeout_watcher(void *arg)
             // handle kill cont'd: if we're not locked, check against the last_activity
             else
             {
-                if (now - last_activity > timeout_kill - warn_before_kill_seconds)
+                if ((warn_before_kill_seconds > 0) && (kill_warned == 0) && (now - last_activity > timeout_kill - warn_before_kill_seconds))
                 {
                     kill_warned = 1;
                     fprintf(stderr, "warning: your session will be killed in %lu seconds if no input activity is detected.", warn_before_kill_seconds);
