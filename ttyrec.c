@@ -1,4 +1,4 @@
-// vim: noai:ts=4:sw=4:expandtab:
+// vim: noai:sts=4:ts=4:sw=4:et
 
 /* Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file.
@@ -210,7 +210,7 @@ static time_t locked_since  = 0;
 static int    lock_warned   = 0;
 static int    kill_warned   = 0;
 
-static const char version[] = "1.1.6.4";
+static const char version[] = "1.1.6.5";
 
 static FILE *fscript;
 static int  child;
@@ -1327,6 +1327,21 @@ void dooutput(void)
         if (use_tty)
         {
             cc = read(master, obuf, BUFSIZ);
+
+            if (cc == 0)
+            {
+                printdbg("\r\n%s(" PID_T_FORMAT "): got EOF, there's nothing left to read from\r\n", me, getpid());
+                break;
+            }
+            if (cc < 0)
+            {
+                printdbg2("[out:%d,%s]", cc, strerror(errno));
+                if (errno != EINTR)
+                {
+                    printdbg("\r\n%s(" PID_T_FORMAT "): got fatal error when reading, there's nothing left to read from\r\n", me, getpid());
+                    break;
+                }
+            }
         }
         // we don't have a tty and use pipes
         else
@@ -1391,15 +1406,33 @@ void dooutput(void)
             {
                 if (current_fd == stderr_pipe[0])
                 {
-                    printdbg2("[stderr:eof]");
-                    stderr_pipe_opened = 0;
-                    close(stderr_pipe[0]);
+                    if (cc == 0) {
+                        printdbg2("[stderr:eof]");
+                    }
+                    else
+                    {
+                        printdbg2("[stderr:err=%d,%s]", cc, strerror(errno));
+                    }
+                    if (errno != EINTR)
+                    {
+                        stderr_pipe_opened = 0;
+                        close(stderr_pipe[0]);
+                    }
                 }
                 if (current_fd == stdout_pipe[0])
                 {
-                    printdbg2("[stdout:eof]");
-                    stdout_pipe_opened = 0;
-                    close(stdout_pipe[0]);
+                    if (cc == 0) {
+                        printdbg2("[stdout:eof]");
+                    }
+                    else
+                    {
+                        printdbg2("[stdout:err=%d,%s]", cc, strerror(errno));
+                    }
+                    if (errno != EINTR)
+                    {
+                        stdout_pipe_opened = 0;
+                        close(stdout_pipe[0]);
+                    }
                 }
                 if ((stderr_pipe_opened == 0) && (stdout_pipe_opened == 0))
                 {
@@ -1412,20 +1445,6 @@ void dooutput(void)
         // here, we have cc with the number of bytes read, from either the tty or the pipes
 
         printdbg2("[out:%d]", cc);
-        if (cc == 0)
-        {
-            printdbg("\r\n%s(" PID_T_FORMAT "): got EOF, there's nothing left to read from\r\n", me, getpid());
-            break;
-        }
-        if (cc < 0)
-        {
-            printdbg2("[out:%s]", strerror(errno));
-            if (errno != EINTR)
-            {
-                printdbg("\r\n%s(" PID_T_FORMAT "): got fatal error when reading, there's nothing left to read from\r\n", me, getpid());
-                break;
-            }
-        }
 
         if (!locked_since && (cc > 0))
         {
