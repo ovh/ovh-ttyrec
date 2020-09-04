@@ -1412,11 +1412,11 @@ void dooutput(void)
                     else
                     {
                         printdbg2("[stderr:err=%d,%s]", cc, strerror(errno));
-                    }
-                    if (errno != EINTR)
-                    {
-                        stderr_pipe_opened = 0;
-                        close(stderr_pipe[0]);
+                        if (errno != EINTR)
+                        {
+                            stderr_pipe_opened = 0;
+                            close(stderr_pipe[0]);
+                        }
                     }
                 }
                 if (current_fd == stdout_pipe[0])
@@ -1427,11 +1427,11 @@ void dooutput(void)
                     else
                     {
                         printdbg2("[stdout:err=%d,%s]", cc, strerror(errno));
-                    }
-                    if (errno != EINTR)
-                    {
-                        stdout_pipe_opened = 0;
-                        close(stdout_pipe[0]);
+                        if (errno != EINTR)
+                        {
+                            stdout_pipe_opened = 0;
+                            close(stdout_pipe[0]);
+                        }
                     }
                 }
                 if ((stderr_pipe_opened == 0) && (stdout_pipe_opened == 0))
