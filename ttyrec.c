@@ -1408,6 +1408,8 @@ void dooutput(void)
                 {
                     if (cc == 0) {
                         printdbg2("[stderr:eof]");
+                        stderr_pipe_opened = 0;
+                        close(stderr_pipe[0]);
                     }
                     else
                     {
@@ -1423,6 +1425,8 @@ void dooutput(void)
                 {
                     if (cc == 0) {
                         printdbg2("[stdout:eof]");
+                        stdout_pipe_opened = 0;
+                        close(stdout_pipe[0]);
                     }
                     else
                     {
