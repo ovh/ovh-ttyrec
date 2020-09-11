@@ -1221,7 +1221,7 @@ void do_lock(void)
 void *timeout_watcher(void *arg)
 {
     (void)arg;
-    for ( ; ; )
+    for ( ; ;)
     {
         sleep(1);
         time_t now = time(NULL);
@@ -1319,7 +1319,7 @@ void dooutput(void)
         (void)fputs(ansi_restore, stdout);
     }
 
-    for ( ; ; )
+    for ( ; ;)
     {
         Header h;
 
@@ -1370,78 +1370,58 @@ void dooutput(void)
             int current_fd = -1;
 
             cc = 0;
-            if (retval == -1)
+            if (retval == -1) // select failed
             {
-                if (errno == EINTR)
-                {
-                    continue;
-                }
-                else
+                if (errno != EINTR)
                 {
                     perror("select()");
                 }
+                continue;
             }
             else if (retval)
             {
+                const char *current_fd_name;
+                int        *pipe_flag;
                 if (FD_ISSET(stderr_pipe[0], &rfds))
                 {
-                    current_fd = stderr_pipe[0];
-                    target_fd  = 2; // stderr
+                    current_fd      = stderr_pipe[0];
+                    current_fd_name = "stderr";
+                    pipe_flag       = &stderr_pipe_opened;
+                    target_fd       = 2; // stderr
                 }
                 else if (FD_ISSET(stdout_pipe[0], &rfds))
                 {
-                    current_fd = stdout_pipe[0];
-                    target_fd  = 1; // stdout
+                    current_fd      = stdout_pipe[0];
+                    current_fd_name = "stdout";
+                    pipe_flag       = &stdout_pipe_opened;
+                    target_fd       = 1; // stdout
                 }
                 else
                 {
                     perror("select() returned invalid fd");
+                    continue;
                 }
-            }
-            if (current_fd != -1)
-            {
+
                 cc = read(current_fd, obuf, BUFSIZ);
-            }
-            if (cc <= 0)
-            {
-                if (current_fd == stderr_pipe[0])
+
+                // Handle error & EOF
+                if ((cc == 0) || (cc < 0 && errno != EINTR))
                 {
-                    if (cc == 0) {
-                        printdbg2("[stderr:eof]");
-                        stderr_pipe_opened = 0;
-                        close(stderr_pipe[0]);
+                    if (cc == 0)
+                    {
+                        printdbg2("[%s:eof]", current_fd_name);
                     }
                     else
                     {
-                        printdbg2("[stderr:err=%d,%s]", cc, strerror(errno));
-                        if (errno != EINTR)
-                        {
-                            stderr_pipe_opened = 0;
-                            close(stderr_pipe[0]);
-                        }
+                        printdbg2("[%s:err=%d,%s]", current_fd_name, cc, strerror(errno));
                     }
-                }
-                if (current_fd == stdout_pipe[0])
-                {
-                    if (cc == 0) {
-                        printdbg2("[stdout:eof]");
-                        stdout_pipe_opened = 0;
-                        close(stdout_pipe[0]);
-                    }
-                    else
+                    *pipe_flag = 0;
+                    close(current_fd);
+                    if ((stderr_pipe_opened == 0) && (stdout_pipe_opened == 0))
                     {
-                        printdbg2("[stdout:err=%d,%s]", cc, strerror(errno));
-                        if (errno != EINTR)
-                        {
-                            stdout_pipe_opened = 0;
-                            close(stdout_pipe[0]);
-                        }
+                        printdbg2("[alleof]");
+                        break;
                     }
-                }
-                if ((stderr_pipe_opened == 0) && (stdout_pipe_opened == 0))
-                {
-                    printdbg2("[alleof]");
-                    break;
                 }
             }
         }
@@ -1596,6 +1576,7 @@ void done(int status)
     // again, we end up doing double-frees and calling exit() twice, which gets us a segfault. Hereby, ensure
     // that once we've entered this function once, we'll never re-enter it through a sighandler.
     static pthread_mutex_t entered_done = PTHREAD_MUTEX_INITIALIZER;
+
     if (pthread_mutex_trylock(&entered_done) != 0)
     {
         return;
@@ -2083,8 +2064,8 @@ void help(void)
             "  -a, --append              open the ttyrec output file in append mode instead of write-clobber mode\n");
 #ifdef HAVE_zstd
     fprintf(stderr,                                                                                                                         \
-            "  -Z                        enable on-the-fly compression if available, silently fallback to no compression if not\n"        \
-            "      --zstd                force on-the-fly compression of output file using zstd,\n"                                        \
+            "  -Z                        enable on-the-fly compression if available, silently fallback to no compression if not\n"          \
+            "      --zstd                force on-the-fly compression of output file using zstd,\n"                                         \
             "                              the resulting file will have a '.ttyrec.zst' extension\n"                                        \
             "      --max-flush-time S    specify the maximum number of seconds after which we'll force zstd to flush its output buffers\n"  \
             "                              to ensure that even somewhat quiet sessions gets regularly written out to disk, default is %d\n" \
