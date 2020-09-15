@@ -1,0 +1,41 @@
+name: basic checks
+
+on: [pull_request]
+
+jobs:
+
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: install prerequisites
+      run: sudo apt-get install -y uncrustify make git debhelper
+
+    - name: verify debian changelog
+      run: |
+        VERSION=$(awk '/static const char version/ { gsub(/[\";]/, "", $6); print $6; exit }' ttyrec.c)
+        if ! head -n1 debian/changelog | grep -F "ovh-ttyrec ($VERSION) master"; then
+          echo "inconsistency between version ($VERSION) and debian changelog:"
+          head -n1 debian/changelog
+          exit 1
+        fi
+
+    - name: check style
+      run: |
+        ./configure
+        make style
+        git diff
+        if ! git diff --quiet; then
+          echo "Please make style."
+          exit 1
+        fi
+
+    - name: try to build .deb
+      run: |
+        make
+        make test
+        make deb
+        ls -l ..
