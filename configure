@@ -18,7 +18,7 @@ COMPRESS_ZSTD=''
 
 os=$(uname -s)
 if [ "$os" = Linux ]; then
-    CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED -D_GNU_SOURCE"
+    CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED -D_GNU_SOURCE -pipe"
 elif [ "$os" = NetBSD ]; then
     true
 elif [ "$os" = FreeBSD ]; then
