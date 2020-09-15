@@ -1404,7 +1404,7 @@ void dooutput(void)
 
                 cc = read(current_fd, obuf, BUFSIZ);
 
-                // Handle error & EOF
+                // Handle EOF or error
                 if ((cc == 0) || (cc < 0 && errno != EINTR))
                 {
                     if (cc == 0)
