@@ -2,7 +2,7 @@ ovh-ttyrec (1.1.6.5) master; urgency=medium
 
   * fix: race condition when running w/o pty
 
- -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Thu, 04 Sep 2020 16:49:22 +0200
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Thu, 15 Sep 2020 10:59:22 +0200
 
 ovh-ttyrec (1.1.6.4) master; urgency=medium
 
