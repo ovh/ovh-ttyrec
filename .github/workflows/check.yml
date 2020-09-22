@@ -1,6 +1,6 @@
 name: basic checks
 
-on: [pull_request]
+on: [pull_request, push]
 
 jobs:
 
@@ -11,9 +11,6 @@ jobs:
 
     - uses: actions/checkout@v2
 
-    - name: install prerequisites
-      run: sudo apt-get install -y uncrustify make git debhelper
-
     - name: verify debian changelog
       run: |
         VERSION=$(awk '/static const char version/ { gsub(/[\";]/, "", $6); print $6; exit }' ttyrec.c)
@@ -22,6 +19,9 @@ jobs:
           head -n1 debian/changelog
           exit 1
         fi
+
+    - name: install prerequisites
+      run: sudo apt-get install -y uncrustify make git debhelper
 
     - name: check style
       run: |
@@ -33,9 +33,38 @@ jobs:
           exit 1
         fi
 
-    - name: try to build .deb
+    - name: compile with zstd autodetection (none)
       run: |
-        make
-        make test
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd'; then
+            exit 1
+        fi
+
+    - name: compile with zstd autodetection (static)
+      run: |
+        sudo apt-get install -y libzstd-dev
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
+        ./ttyrec -V | grep -qF 'zstd[static]'
+
+    - name: compile with shared libzstd
+      run: |
+        make clean && NO_STATIC_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd[static]'; then
+            exit 1
+        fi
+        ./ttyrec -V | grep -qF 'zstd'
+
+    - name: compile without zstd support
+      run: |
+        make clean && NO_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd'; then
+            exit 1
+        fi
+
+    - name: build and test debian package
+      run: |
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
         make deb
         ls -l ..
+        sudo dpkg -i ../ovh-ttyrec_*.deb
+        dpkg -L ovh-ttyrec
