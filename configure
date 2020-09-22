@@ -16,6 +16,10 @@ CFLAGS='-Werror -std=c99'
 PTHREAD=''
 COMPRESS_ZSTD=''
 
+if [ "$STATIC" = 1 ]; then
+    CFLAGS="$CFLAGS -static"
+fi
+
 os=$(uname -s)
 if [ "$os" = Linux ]; then
     CFLAGS="$CFLAGS -D_XOPEN_SOURCE=600 -D_XOPEN_SOURCE_EXTENDED -D_GNU_SOURCE -pipe"
