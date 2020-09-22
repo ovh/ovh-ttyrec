@@ -1,0 +1,118 @@
+name: publish release assets
+
+on:
+  release:
+    types: [published]
+
+jobs:
+
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: verify debian changelog
+      run: |
+        VERSION=$(awk '/static const char version/ { gsub(/[\";]/, "", $6); print $6; exit }' ttyrec.c)
+        if ! head -n1 debian/changelog | grep -F "ovh-ttyrec ($VERSION) master"; then
+          echo "inconsistency between version ($VERSION) and debian changelog:"
+          head -n1 debian/changelog
+          exit 1
+        fi
+
+    - name: install prerequisites
+      run: sudo apt-get install -y uncrustify make git debhelper tar gzip
+
+    - name: check style
+      run: |
+        ./configure
+        make style
+        git diff
+        if ! git diff --quiet; then
+          echo "Please make style."
+          exit 1
+        fi
+
+    - name: compile with zstd autodetection (none)
+      run: |
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd'; then
+            exit 1
+        fi
+
+    - name: compile with zstd autodetection (static)
+      run: |
+        sudo apt-get install -y libzstd-dev
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
+        ./ttyrec -V | grep -qF 'zstd[static]'
+
+    - name: compile with shared libzstd
+      run: |
+        make clean && NO_STATIC_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd[static]'; then
+            exit 1
+        fi
+        ./ttyrec -V | grep -qF 'zstd'
+
+    - name: compile without zstd support
+      run: |
+        make clean && NO_ZSTD=1 ./configure && make -j$(nproc) && ./ttyrec -V
+        if ./ttyrec -V | grep -qF 'zstd'; then
+            exit 1
+        fi
+
+    - name: build and test debian package
+      run: |
+        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
+        make deb
+        ls -l ..
+        sudo dpkg -i ../ovh-ttyrec_*.deb
+        dpkg -L ovh-ttyrec
+
+    - name: build fully static version
+        make clean && STATIC=1 ./configure && make -j$(nproc) && ./ttyrec -V
+        ./ttyrec -V | grep -qF 'zstd[static]'
+        if ldd ttyrec; then
+            exit 1
+        fi
+
+    - name: get release vars
+      id: getvars
+      run: |
+        upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
+        echo "Upload URL is $upload_url"
+        echo "::set-output name=upload_url::$upload_url"
+        debname=$(ls ./ovh-ttyrec_*.deb)
+        echo "Debian package name is $debname"
+        echo "::set-output name=debian_package::$debname"
+        version=$(echo "$debname" | cut -d_ -f2)
+        mkdir ovh-ttyrec-$version
+        install ttyrec ttyplay ttytime ovh-ttyrec-$version
+        cp ttyrec.1 ttyplay.1 ttytime.1 ovh-ttyrec-$version
+        tar cvzf ovh-ttyrec-$version.tar.gz ovh-ttyrec-$version
+        echo "Static tar.gz archive name is $debname"
+        echo "::set-output name=static_package::ovh-ttyrec-$version.tar.gz"
+
+    - name: upload debian package
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        asset_path: ./${{ steps.getvars.outputs.debian_package }}
+        asset_name: ${{ steps.getvars.outputs.debian_package }}
+        asset_content_type: application/x-debian-package
+
+    - name: upload static binary
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        asset_path: ./${{ steps.getvars.outputs.static_package }}
+        asset_name: ${{ steps.getvars.outputs.static_package }}
+        asset_content_type: application/gzip
