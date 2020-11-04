@@ -13,7 +13,7 @@ jobs:
 
     - uses: actions/checkout@v2
 
-    - name: verify debian changelog
+    - name: verify changelogs
       run: |
         VERSION=$(awk '/static const char version/ { gsub(/[\";]/, "", $6); print $6; exit }' ttyrec.c)
         if ! head -n1 debian/changelog | grep -F "ovh-ttyrec ($VERSION) master"; then
@@ -21,9 +21,22 @@ jobs:
           head -n1 debian/changelog
           exit 1
         fi
+        if ! grep -F "  $VERSION" ovh-ttyrec.spec; then
+          echo "inconsistency between version ($VERSION) and rpm changelog:"
+          exit 1
+        fi
 
     - name: install prerequisites
-      run: sudo apt-get install -y uncrustify make git debhelper tar gzip
+      run: sudo apt-get update && sudo apt-get install -y uncrustify make git debhelper tar gzip jq zip unzip rpm rsync
+
+    - name: create source zip file for rpm build
+      run: |
+        curdir=$PWD
+        tempfolder=$(mktemp -d)
+        cd $tempfolder
+        mkdir ovh-ttyrec
+        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
+        zip -9r ~/ovh-ttyrec.zip ovh-ttyrec
 
     - name: check style
       run: |
@@ -79,22 +92,37 @@ jobs:
             exit 1
         fi
 
+    - name: build rpm package
+      run: |
+        mkdir -p ~/rpmbuild/SOURCES
+        mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES/master.zip
+        unzip -l ~/rpmbuild/SOURCES/master.zip
+        rpmbuild -bb ovh-ttyrec.spec
+
     - name: get release vars
       id: getvars
       run: |
         upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
         echo "Upload URL is $upload_url"
         echo "::set-output name=upload_url::$upload_url"
-        debname=$(basename $(ls ../ovh-ttyrec_*.deb))
-        echo "Debian package name is $debname"
-        echo "::set-output name=debian_package::$debname"
+        rpmpath=$(readlink -f $(find ~/rpmbuild/RPMS -type f -name "*.rpm"))
+        rpmname=$(basename "$rpmpath")
+        echo "RPM package name is $rpmname ($rpmpath)"
+        echo "::set-output name=rpmname::$rpmname"
+        echo "::set-output name=rpmpath::$rpmpath"
+        debpath=$(readlink -f $(find .. -mindepth 1 -maxdepth 1 -type f -name "*.deb"))
+        debname=$(basename "$debpath")
+        echo "Debian package name is $debname ($debpath)"
+        echo "::set-output name=debname::$debname"
+        echo "::set-output name=debpath::$debpath"
         version=$(echo "$debname" | cut -d_ -f2)
         mkdir ovh-ttyrec-$version
         install ttyrec ttyplay ttytime ovh-ttyrec-$version
         cp -va docs ovh-ttyrec-$version
-        tar cvzf ovh-ttyrec-$version-linux-static-binary.tar.gz ovh-ttyrec-$version
-        echo "Static tar.gz archive name is $debname"
-        echo "::set-output name=static_package::ovh-ttyrec-$version-linux-static-binary.tar.gz"
+        staticname=ovh-ttyrec-$version-linux-static-binary.tar.gz
+        tar cvzf $staticname ovh-ttyrec-$version
+        echo "Static tar.gz archive name is $staticname"
+        echo "::set-output name=static_package::$staticname"
 
     - name: upload debian package
       id: upload-release-asset1
@@ -103,17 +131,28 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.getvars.outputs.upload_url }}
-        asset_path: ../${{ steps.getvars.outputs.debian_package }}
-        asset_name: ${{ steps.getvars.outputs.debian_package }}
+        asset_path: ${{ steps.getvars.outputs.debpath }}
+        asset_name: ${{ steps.getvars.outputs.debname }}
         asset_content_type: application/x-debian-package
 
-    - name: upload static binary
+    - name: upload rpm package
       id: upload-release-asset2
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.getvars.outputs.upload_url }}
-        asset_path: ./${{ steps.getvars.outputs.static_package }}
+        asset_path: ${{ steps.getvars.outputs.rpmpath }}
+        asset_name: ${{ steps.getvars.outputs.rpmname }}
+        asset_content_type: application/x-rpm
+
+    - name: upload static binary
+      id: upload-release-asset3
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        asset_path: ${{ steps.getvars.outputs.static_package }}
         asset_name: ${{ steps.getvars.outputs.static_package }}
         asset_content_type: application/gzip
