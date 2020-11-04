@@ -34,10 +34,10 @@ dist:
 	tar cvzf ttyrec.tar.gz *.c *.h docs/ debian/ configure Makefile.in uncrustify.cfg
 
 install:
-	install -d -m 0755 -o root -g root $(BIN)
-	install    -m 0755 -o root -g root ttyrec $(BIN)
-	install    -m 0755 -o root -g root ttyplay $(BIN)
-	install    -m 0755 -o root -g root ttytime $(BIN)
+	install -d $(BIN)
+	install    ttyrec $(BIN)
+	install    ttyplay $(BIN)
+	install    ttytime $(BIN)
 
 test: all
 	./ttyrec -V
