@@ -245,6 +245,7 @@ rm -f $(dirname $0)/Makefile.tmp
 cat >>"$curdir/configure.h" <<EOF
 #define DEFINES_STR "$DEFINES_STR"
 #define COMPILER_NAME "$CC"
+#define MACHINE_STR "$($CC -dumpmachine)"
 #endif
 EOF
 

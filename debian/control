@@ -11,7 +11,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: ttyrec
 Description: Extended (but compatible) fork of ttyrec
  ttyrec is a terminal (tty) recorder, it comes with ttyplay, which is a tty player.
- Some features ov ovh-ttyrec follow:
+ Some features of ovh-ttyrec follow:
  -   Drop-in replacement of the classic ttyrec, additional features don't break compatibility
  -   The code is portable and OS features that can be used are detected at compile time
  -   Supports ttyrec output file rotation without interrupting the session

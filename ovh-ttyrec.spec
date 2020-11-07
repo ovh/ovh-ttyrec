@@ -1,54 +1,70 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.1.6.5
+Version: 1.1.6.6
 Release: 1
-License: 3-Clause BSD
+License: BSD
 Group: Applications/System
 Source: https://github.com/ovh/ovh-ttyrec/archive/master.zip
-BuildRoot: /var/tmp/%{name}-buildroot
 
 %description
-Description: Extended (but compatible) fork of ttyrec
- ttyrec is a terminal (tty) recorder, it comes with ttyplay, which is a tty player.
- Some features ov ovh-ttyrec follow:
- -   Drop-in replacement of the classic ttyrec, additional features don't break compatibility
- -   The code is portable and OS features that can be used are detected at compile time
- -   Supports ttyrec output file rotation without interrupting the session
- -   Supports locking the session after a keyboard input timeout, optionally displaying a custom message
- -   Supports terminating the session after a keyboard input timeout
- -   Supports manually locking or terminating the session via "cheatcodes" (specific keystrokes)
- -   Supports a no-tty mode, relying on pipes instead of pseudottys, while still recording stdout/stderr
- -   Automatically detects whether to use pseudottys or pipes, also overridable from command-line
- -   Supports reporting the number of bytes that were output to the terminal on session exit
+Extended (but compatible) fork of ttyrec.
+ttyrec is a terminal (tty) recorder,
+it comes with ttyplay, which is a tty player.
+
+Some features of ovh-ttyrec follow:
+- Drop-in replacement of the classic ttyrec,
+  additional features don't break compatibility
+- The code is portable and OS features that
+  can be used are detected at compile time
+- Supports ttyrec output file rotation
+  without interrupting the session
+- Supports locking the session after a keyboard input
+  timeout, optionally displaying a custom message
+- Supports terminating the session after a keyboard input timeout
+- Supports manually locking or terminating the
+  session via "cheatcodes" (specific keystrokes)
+- Supports a no-tty mode, relying on pipes instead
+  of pseudottys, while still recording stdout/stderr
+- Automatically detects whether to use pseudottys
+  or pipes, also overridable from command-line
+- Supports reporting the number of bytes that
+  were output to the terminal on session exit
 
 %prep
 
 %setup -q -n ovh-ttyrec
 
 %build
-STATIC=1 ./configure
-make RPM_OPT_FLAGS="$RPM_OPT_FLAGS"
+%configure
+%make_build
 
 %install
-make DESTDIR="$RPM_BUILD_ROOT" install
+%make_install
+find "$RPM_BUILD_ROOT"/usr/bin -type f -exec strip '{}' \;
+find "$RPM_BUILD_ROOT"
 
 %clean
 rm -rf -- "$RPM_BUILD_ROOT"
 
 %files
-%doc docs/ttyplay.1 docs/ttytime.1 docs/ttyrec.1
-/usr/bin/ttyplay
-/usr/bin/ttytime
-/usr/bin/ttyrec
+%{_mandir}/man1/ttyplay.*
+%{_mandir}/man1/ttytime.*
+%{_mandir}/man1/ttyrec.*
+%{_bindir}/ttyplay
+%{_bindir}/ttytime
+%{_bindir}/ttyrec
 
 %changelog
-* Thu Sep 15 2020 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.5
+* Mon Nov 09 2020 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.6
+- chore: display machine triplet in -V
+
+* Tue Sep 15 2020 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.5
 - fix: race condition when running w/o pty
 
 * Thu Mar 05 2020 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.4
 - fix: -k was not working correctly when used without -t
 
-* Fri Oct 10 2019 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.3
+* Thu Oct 10 2019 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.3
 - fix: race condition on exit when a sighandler gets called while we're in libc's exit(), fixes #7
 
 * Fri Aug 30 2019 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.2
