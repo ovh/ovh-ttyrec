@@ -1,5 +1,5 @@
 CC = %CC%
-CFLAGS = -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS%
+CFLAGS = -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS% $(RPM_OPT_FLAGS)
 LDFLAGS = -L/usr/local/lib
 LDLIBS = %LDLIBS%
 
@@ -7,10 +7,17 @@ BINARIES = ttyrec ttyplay ttytime
 
 BIN = $(DESTDIR)/usr/bin
 
+.PHONY: all deb rpm clean distclean style dist install test
+
 all: $(BINARIES)
 
 deb:
 	dpkg-buildpackage -b -rfakeroot -us -uc
+
+rpm: clean
+	o=$$PWD && t=$$(mktemp -d) && cd $$t && mkdir ovh-ttyrec && rsync -a --exclude=.git $$o/ ovh-ttyrec/ && zip -9r ~/rpmbuild/SOURCES/master.zip ovh-ttyrec
+	rpmbuild -bb ovh-ttyrec.spec
+	ls -lh ~/rpmbuild/RPMS/*/ovh-ttyrec*.rpm
 
 ttyrec: ttyrec.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS) %PTHREAD%
@@ -38,6 +45,7 @@ install:
 	install    ttyrec $(BIN)
 	install    ttyplay $(BIN)
 	install    ttytime $(BIN)
+	install -m 0644 -D -t $(DESTDIR)/usr/share/man/man1/ docs/*
 
 test: all
 	./ttyrec -V

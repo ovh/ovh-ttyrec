@@ -6,7 +6,7 @@ on:
 
 jobs:
 
-  check:
+  checks:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,16 +27,7 @@ jobs:
         fi
 
     - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y uncrustify make git debhelper tar gzip jq zip unzip rpm rsync
-
-    - name: create source zip file for rpm build
-      run: |
-        curdir=$PWD
-        tempfolder=$(mktemp -d)
-        cd $tempfolder
-        mkdir ovh-ttyrec
-        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
-        zip -9r ~/ovh-ttyrec.zip ovh-ttyrec
+      run: sudo apt-get update && sudo apt-get install -y uncrustify make git gcc
 
     - name: check style
       run: |
@@ -76,15 +67,7 @@ jobs:
             exit 1
         fi
 
-    - name: build and test debian package
-      run: |
-        make clean && ./configure && make -j$(nproc) && ./ttyrec -V
-        make deb
-        ls -l ..
-        sudo dpkg -i ../ovh-ttyrec_*.deb
-        dpkg -L ovh-ttyrec
-
-    - name: build fully static version
+    - name: compile fully static version
       run: |
         make clean && STATIC=1 ./configure && make -j$(nproc) && ./ttyrec -V
         ./ttyrec -V | grep -qF 'zstd[static]'
@@ -92,12 +75,78 @@ jobs:
             exit 1
         fi
 
-    - name: build rpm package
+  multiarch:
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cross:
+          - arm32v5
+          - arm32v7
+          - arm64v8
+          - ppc64le
+          - mips64le
+          - s390x
+          - i386
+          - amd64
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: prepare qemu
+      run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+    - name: install prerequisites
+      run: sudo apt-get update && sudo apt-get install -y rsync zip jq
+
+    - name: create source zip file for rpm build
       run: |
+        curdir=$PWD
+        tempfolder=$(mktemp -d)
+        cd $tempfolder
+        mkdir ovh-ttyrec
+        rsync -va --exclude=.git $curdir/ ovh-ttyrec/
         mkdir -p ~/rpmbuild/SOURCES
-        mv ~/ovh-ttyrec.zip ~/rpmbuild/SOURCES/master.zip
-        unzip -l ~/rpmbuild/SOURCES/master.zip
-        rpmbuild -bb ovh-ttyrec.spec
+        zip -9r ~/rpmbuild/SOURCES/master.zip ovh-ttyrec
+
+    - name: build for ${{ matrix.cross }}
+      run: >
+        mkdir /tmp/pkg &&
+        docker run --rm -e DEBIAN_FRONTEND=noninteractive
+        -v $PWD:/pkg/code
+        -v /tmp/pkg:/pkg
+        -v $HOME:/root
+        ${{ matrix.cross }}/debian
+        /bin/bash -c '
+          set -exo pipefail;
+          apt-get update;
+          apt-get install -y make gcc libzstd-dev dpkg-dev debhelper unzip rpm binutils;
+          cd /pkg/code;
+          dpkg-buildpackage -b -rfakeroot -us -uc;
+          if [ "${{ matrix.cross }}" = i386 ]; then target="--target=i386"; else target=""; fi
+          set +o pipefail;
+          rpm --showrc | head;
+          set -o pipefail;
+          if [ $(rpm -E "%{_arch}") != "%{_arch}" ]; then
+            rpmbuild -bb $target ovh-ttyrec.spec;
+          else
+            arch=$(rpm --showrc | grep "^build arch" | awk "{print \$4}");
+            rpmbuild --define "_arch $arch" -bb $target ovh-ttyrec.spec;
+          fi;
+          mv ~/rpmbuild/RPMS/*/*.rpm /pkg;
+          STATIC=1 ./configure && make clean && make -j$(nproc) && ./ttyrec -V;
+          ./ttyrec -V | grep -qF "zstd[static]";
+          if ldd ttyrec; then
+            exit 1;
+          fi;
+          version=$(./ttyrec -V | head -n1 | cut -d" " -f2 | grep -Eo "[0-9][A-Za-z0-9._-]+");
+          mkdir ovh-ttyrec-$version;
+          strip ttyrec ttyplay ttytime;
+          install ttyrec ttyplay ttytime ovh-ttyrec-$version;
+          cp -va docs ovh-ttyrec-$version;
+          staticname=ovh-ttyrec-${version}_$(dpkg --print-architecture)-linux-static-binary.tar.gz;
+          tar cvzf /pkg/$staticname ovh-ttyrec-$version;
+          '
 
     - name: get release vars
       id: getvars
@@ -105,38 +154,23 @@ jobs:
         upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
         echo "Upload URL is $upload_url"
         echo "::set-output name=upload_url::$upload_url"
-        rpmpath=$(readlink -f $(find ~/rpmbuild/RPMS -type f -name "*.rpm"))
+        rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
         rpmname=$(basename "$rpmpath")
         echo "RPM package name is $rpmname ($rpmpath)"
         echo "::set-output name=rpmname::$rpmname"
         echo "::set-output name=rpmpath::$rpmpath"
-        debpath=$(readlink -f $(find .. -mindepth 1 -maxdepth 1 -type f -name "*.deb"))
+        debpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.deb" ! -name "*dbgsym*")
         debname=$(basename "$debpath")
         echo "Debian package name is $debname ($debpath)"
         echo "::set-output name=debname::$debname"
         echo "::set-output name=debpath::$debpath"
-        version=$(echo "$debname" | cut -d_ -f2)
-        mkdir ovh-ttyrec-$version
-        install ttyrec ttyplay ttytime ovh-ttyrec-$version
-        cp -va docs ovh-ttyrec-$version
-        staticname=ovh-ttyrec-$version-linux-static-binary.tar.gz
-        tar cvzf $staticname ovh-ttyrec-$version
-        echo "Static tar.gz archive name is $staticname"
-        echo "::set-output name=static_package::$staticname"
-
-    - name: upload debian package
-      id: upload-release-asset1
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.getvars.outputs.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.debpath }}
-        asset_name: ${{ steps.getvars.outputs.debname }}
-        asset_content_type: application/x-debian-package
+        staticpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*-linux-static-binary.tar.gz" | head -n1)
+        staticname=$(basename "$staticpath")
+        echo "Static tar.gz archive name is $staticname ($staticpath)"
+        echo "::set-output name=staticname::$staticname"
+        echo "::set-output name=staticpath::$staticpath"
 
     - name: upload rpm package
-      id: upload-release-asset2
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -146,13 +180,22 @@ jobs:
         asset_name: ${{ steps.getvars.outputs.rpmname }}
         asset_content_type: application/x-rpm
 
-    - name: upload static binary
-      id: upload-release-asset3
+    - name: upload debian package
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.getvars.outputs.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.static_package }}
-        asset_name: ${{ steps.getvars.outputs.static_package }}
+        asset_path: ${{ steps.getvars.outputs.debpath }}
+        asset_name: ${{ steps.getvars.outputs.debname }}
+        asset_content_type: application/x-debian-package
+
+    - name: upload static binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        asset_path: ${{ steps.getvars.outputs.staticpath }}
+        asset_name: ${{ steps.getvars.outputs.staticname }}
         asset_content_type: application/gzip

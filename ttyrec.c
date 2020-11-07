@@ -210,7 +210,7 @@ static time_t locked_since  = 0;
 static int    lock_warned   = 0;
 static int    kill_warned   = 0;
 
-static const char version[] = "1.1.6.5";
+static const char version[] = "1.1.6.6";
 
 static FILE *fscript;
 static int  child;
@@ -509,15 +509,15 @@ int main(int argc, char **argv)
 
         // version
         case 'V':
-            printf("ttyrec v%s\r\n", version);
+            printf("ttyrec v%s (%s)\n", version, MACHINE_STR);
 #ifdef DEFINES_STR
-            printf("%s (%s)\r\n", DEFINES_STR, OS_STR);
+            printf("%s (%s)\n", DEFINES_STR, OS_STR);
 #endif
 #ifdef __VERSION__
-            printf("compiler version %s (%s)\r\n", __VERSION__, COMPILER_NAME);
+            printf("compiler version %s (%s)\n", __VERSION__, COMPILER_NAME);
 #endif
 #ifdef HAVE_zstd
-            printf("libzstd version %u (%d.%d.%d)\r\n", ZSTD_versionNumber(), ZSTD_VERSION_MAJOR, ZSTD_VERSION_MINOR, ZSTD_VERSION_RELEASE);
+            printf("libzstd version %u (%d.%d.%d)\n", ZSTD_versionNumber(), ZSTD_VERSION_MAJOR, ZSTD_VERSION_MINOR, ZSTD_VERSION_RELEASE);
 #endif
             exit(0);
 

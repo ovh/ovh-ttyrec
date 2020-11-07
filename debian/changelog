@@ -1,8 +1,14 @@
+ovh-ttyrec (1.1.6.6) master; urgency=medium
+
+  * chore: display machine triplet in -V
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Mon, 09 Nov 2020 10:23:41 +0100
+
 ovh-ttyrec (1.1.6.5) master; urgency=medium
 
   * fix: race condition when running w/o pty
 
- -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Thu, 15 Sep 2020 10:59:22 +0200
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Tue, 15 Sep 2020 10:59:22 +0200
 
 ovh-ttyrec (1.1.6.4) master; urgency=medium
 
@@ -14,7 +20,7 @@ ovh-ttyrec (1.1.6.3) master; urgency=medium
 
   * fix: race condition on exit when a sighandler gets called while we're in libc's exit(), fixes #7
 
- -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Fri, 10 Oct 2019 14:43:17 +0200
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Thu, 10 Oct 2019 14:43:17 +0200
 
 ovh-ttyrec (1.1.6.2) master; urgency=medium
 

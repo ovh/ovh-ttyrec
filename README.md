@@ -54,11 +54,18 @@ If you want to build a .deb (Debian/Ubuntu) package, just run:
 
         $ ./configure && make deb
 
+## build a .rpm package
+
+If you want to build a .rpm (RHEL/CentOS) package, just run:
+
+        $ ./configure && make rpm
+
 ## usage
 
 The simplest usage is just calling the binary, it'll execute the users' shell and record the session until exit:
 
         $ ttyrec
+
 To replay this session:
 
         $ ttyplay ./ttyrecord
