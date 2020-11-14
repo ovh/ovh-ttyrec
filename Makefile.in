@@ -1,7 +1,7 @@
 CC = %CC%
 CFLAGS = -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS% $(RPM_OPT_FLAGS)
 LDFLAGS = -L/usr/local/lib
-LDLIBS = %LDLIBS%
+LDLIBS = %LDLIBS% %PTHREAD%
 
 BINARIES = ttyrec ttyplay ttytime
 
@@ -20,7 +20,7 @@ rpm: clean
 	ls -lh ~/rpmbuild/RPMS/*/ovh-ttyrec*.rpm
 
 ttyrec: ttyrec.o io.o compress.o %COMPRESS_ZSTD%
-	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS) %PTHREAD%
+	$(CC) $(CFLAGS) -o $@ ttyrec.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
 
 ttyplay: ttyplay.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttyplay.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
