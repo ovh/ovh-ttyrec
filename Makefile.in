@@ -1,11 +1,20 @@
-CC = %CC%
-CFLAGS = -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS% $(RPM_OPT_FLAGS)
-LDFLAGS = -L/usr/local/lib
-LDLIBS = %LDLIBS% %PTHREAD%
+CC ?= %CC%
+CFLAGS += -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -I/usr/local/include %CFLAGS% $(RPM_OPT_FLAGS)
+LDFLAGS += -L/usr/local/lib
+LDLIBS += %LDLIBS% %PTHREAD%
 
 BINARIES = ttyrec ttyplay ttytime
 
-BIN = $(DESTDIR)/usr/bin
+include config.mk
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),FreeBSD)
+    MANDIR ?= $(PREFIX)/man
+else
+    MANDIR ?= $(PREFIX)/share/man
+endif
 
 .PHONY: all deb rpm clean distclean style dist install test
 
@@ -41,11 +50,10 @@ dist:
 	tar cvzf ttyrec.tar.gz *.c *.h docs/ debian/ configure Makefile.in uncrustify.cfg
 
 install:
-	install -d $(BIN)
-	install    ttyrec $(BIN)
-	install    ttyplay $(BIN)
-	install    ttytime $(BIN)
-	install -m 0644 -D -t $(DESTDIR)/usr/share/man/man1/ docs/*
+	install -d $(DESTDIR)$(BINDIR)
+	install $(BINARIES) $(DESTDIR)$(BINDIR)/
+	install -d $(DESTDIR)$(MANDIR)/man1
+	install -m 0644 docs/* $(DESTDIR)$(MANDIR)/man1/
 
 test: all
 	./ttyrec -V
