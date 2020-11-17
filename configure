@@ -1,13 +1,35 @@
 #! /bin/sh
-curdir=$(dirname $0)
+curdir="$(dirname "$0")"
+
+# parse options, they can be specified by the build system (for .deb or .rpm), such as:
+# deb:
+# --build=x86_64-linux-gnu --prefix=/usr --includedir=\${prefix}/include --mandir=\${prefix}/share/man --infodir=\${prefix}/share/info --sysconfdir=/etc --localstatedir=/var --disable-silent-rules --libdir=\${prefix}/lib/x86_64-linux-gnu --libexecdir=\${prefix}/lib/x86_64-linux-gnu --disable-maintainer-mode --disable-dependency-tracking
+# rpm:
+# --host=x86_64-pc-linux-gnu --build=x86_64-pc-linux-gnu --program-prefix= --disable-dependency-tracking --prefix=/usr --exec-prefix=/usr --bindir=/usr/bin --sbindir=/usr/sbin --sysconfdir=/etc --datadir=/usr/share --includedir=/usr/include --libdir=/usr/lib64 --libexecdir=/usr/lib/x86_64-linux-gnu --localstatedir=/var --sharedstatedir=/usr/com --mandir=/usr/share/man --infodir=/usr/share/info
+
+MKCONF="$curdir/config.mk"
+rm -f "$MKCONF"
+touch "$MKCONF"
+while [ -n "$1" ]; do
+    value=$(echo "$1" | cut -d= -f2- | sed -e "s/\${prefix}/\$(PREFIX)/g")
+    case "$1" in
+        --prefix=*) echo "PREFIX ?= $value" >> "$MKCONF";
+                        echo "Will use PREFIX=$value";;
+        --mandir=*) echo "MANDIR ?= $value" >> "$MKCONF";
+                        echo "Will use MANDIR=$value";;
+        --bindir=*) echo "BINDIR ?= $value" >> "$MKCONF";
+                        echo "Will use BINDIR=$value";;
+    esac
+    shift
+done
 
 echo '#ifndef CONFIGURE_H' >"$curdir/configure.h"
 echo '#define CONFIGURE_H' >>"$curdir/configure.h"
 
 printf "%b" "Looking for compiler... "
 [ -z "$CC" ] && CC=gcc
-which $CC >/dev/null 2>&1 || CC=clang
-which $CC >/dev/null 2>&1 || CC=cc
+command -v $CC >/dev/null 2>&1 || CC=clang
+command -v $CC >/dev/null 2>&1 || CC=cc
 echo "$CC"
 
 LDLIBS=''
@@ -40,14 +62,15 @@ elif [ "$os" = Haiku ]; then
 fi
 
 srcfile=$(mktemp)
-mv $srcfile $srcfile.c
+mv "$srcfile" "$srcfile.c"
+# shellcheck disable=SC2064
 trap "rm -f $srcfile.c" INT HUP EXIT
 
 printf "%b" "Checking if compiler can create executables... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 int main(void) { return 0; }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
 else
     echo "no"
@@ -57,10 +80,10 @@ else
 fi
 
 printf "%b" "Checking how to get pthread support... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 int main(void) { return 0; }
 EOF
-if $CC -pthread $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC -pthread "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "-pthread"
     PTHREAD='-pthread'
 else
@@ -70,11 +93,11 @@ fi
 
 
 printf "%b" "Looking for libzstd... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <zstd.h>
 int main(void) { ZSTD_CStream *c = ZSTD_createCStream(); ZSTD_initCStream(c, 3); ZSTD_freeCStream(c); return 0; }
 EOF
-if [ "$NO_ZSTD" != 1 ] && $CC $srcfile.c -L/usr/local/lib -I/usr/local/include -lzstd -o /dev/null >/dev/null 2>&1; then
+if [ "$NO_ZSTD" != 1 ] && $CC "$srcfile.c" -L/usr/local/lib -I/usr/local/include -lzstd -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_zstd' >>"$curdir/configure.h"
     COMPRESS_ZSTD='compress_zstd.o'
@@ -97,11 +120,11 @@ else
 fi
 
 printf "%b" "Looking for isastream()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <stropts.h>
 int main(void) { return isastream(0); }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_isastream' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR isastream"
@@ -110,12 +133,12 @@ else
 fi
 
 printf "%b" "Looking for cfmakeraw()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <termios.h>
 #include <unistd.h>
 int main(void) { cfmakeraw(0); return 0; }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_cfmakeraw' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR cfmakeraw"
@@ -124,11 +147,11 @@ else
 fi
 
 printf "%b" "Looking for getpt()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <stdlib.h>
 int main(void) { return getpt(); }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_getpt' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR getpt"
@@ -137,12 +160,12 @@ else
 fi
 
 printf "%b" "Looking for posix_openpt()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <stdlib.h>
 #include <fcntl.h>
 int main(void) { return posix_openpt(0); }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_posix_openpt' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR posix_openpt"
@@ -151,11 +174,11 @@ else
 fi
 
 printf "%b" "Looking for grantpt()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <stdlib.h>
 int main(void) { (void)ptsname(0); return grantpt(0) + unlockpt(0); }
 EOF
-if $CC $srcfile.c -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -o /dev/null >/dev/null 2>&1; then
     echo "yes"
     echo '#define HAVE_grantpt' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR grantpt"
@@ -164,44 +187,44 @@ else
 fi
 
 printf "%b" "Looking for openpty()... "
-cat >$srcfile.c <<EOF
+cat >"$srcfile.c" <<EOF
 #include <pty.h>
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
-if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+if $CC "$srcfile.c" -lutil -o /dev/null >/dev/null 2>&1; then
     echo "yes (pty.h, libutil)"
     LDLIBS="$LDLIBS -lutil"
     echo '#define HAVE_openpty' >>"$curdir/configure.h"
     echo '#define HAVE_openpty_pty_h' >>"$curdir/configure.h"
     DEFINES_STR="$DEFINES_STR openpty[pty.h]"
 else
-    cat >$srcfile.c <<EOF
+    cat >"$srcfile.c" <<EOF
 #include <util.h>
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
-    if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+    if $CC "$srcfile.c" -lutil -o /dev/null >/dev/null 2>&1; then
         echo "yes (util.h, libutil)"
         LDLIBS="$LDLIBS -lutil"
         echo '#define HAVE_openpty' >>"$curdir/configure.h"
         echo '#define HAVE_openpty_util_h' >>"$curdir/configure.h"
         DEFINES_STR="$DEFINES_STR openpty[util.h]"
     else
-        cat >$srcfile.c <<EOF
+        cat >"$srcfile.c" <<EOF
 #include <libutil.h>
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
-        if $CC $srcfile.c -lutil -o /dev/null >/dev/null 2>&1; then
+        if $CC "$srcfile.c" -lutil -o /dev/null >/dev/null 2>&1; then
             echo "yes (libutil.h, libutil)"
             LDLIBS="$LDLIBS -lutil"
             echo '#define HAVE_openpty' >>"$curdir/configure.h"
             echo '#define HAVE_openpty_libutil_h' >>"$curdir/configure.h"
             DEFINES_STR="$DEFINES_STR openpty[libutil.h]"
         else
-        cat >$srcfile.c <<EOF
+        cat >"$srcfile.c" <<EOF
 #include <pty.h>
 int main(void) { return openpty(0, 0, 0, 0, 0); }
 EOF
-            if $CC $srcfile.c -lbsd -o /dev/null >/dev/null 2>&1; then
+            if $CC "$srcfile.c" -lbsd -o /dev/null >/dev/null 2>&1; then
                 echo "yes (pty.h, libbsd)"
                 echo '#define HAVE_openpty' >>"$curdir/configure.h"
                 echo '#define HAVE_openpty_pty_h' >>"$curdir/configure.h"
@@ -220,8 +243,8 @@ for w in -Wall -Wextra -pedantic -Wno-unused-result -Wbad-function-cast -Wmissin
     -Wpointer-sign -Wmissing-parameter-type -Wold-style-declaration -Wl,--as-needed \
     -Wno-unused-command-line-argument
 do
-    echo 'int main(void) { return 0; }' >$srcfile.c
-    if [ $($CC $srcfile.c $w -o /dev/null 2>&1 | wc -l) = 0 ]; then
+    echo 'int main(void) { return 0; }' >"$srcfile.c"
+    if [ "$($CC "$srcfile.c" $w -o /dev/null 2>&1 | wc -l)" = 0 ]; then
         echo "... OK $w"
         if echo "$w" | grep -q -- '-Wl,'; then
             LDFLAGS="$LDFLAGS $w"
@@ -233,14 +256,14 @@ do
     fi
 done
 
-cat $(dirname $0)/Makefile.in > $(dirname $0)/Makefile.tmp
+cat "$(dirname "$0")"/Makefile.in > "$(dirname "$0")"/Makefile.tmp
 for i in CC LDLIBS CFLAGS COMPRESS_ZSTD PTHREAD
 do
     replace=$(eval printf "%b" "\"\$$i\"")
-    sed "s:%$i%:$replace:g" $(dirname $0)/Makefile.tmp > $(dirname $0)/Makefile
-    cat $(dirname $0)/Makefile > $(dirname $0)/Makefile.tmp
+    sed "s:%$i%:$replace:g" "$(dirname "$0")"/Makefile.tmp > "$(dirname "$0")"/Makefile
+    cat "$(dirname "$0")"/Makefile > "$(dirname "$0")"/Makefile.tmp
 done
-rm -f $(dirname $0)/Makefile.tmp
+rm -f "$(dirname "$0")"/Makefile.tmp
 
 cat >>"$curdir/configure.h" <<EOF
 #define DEFINES_STR "$DEFINES_STR"
