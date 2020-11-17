@@ -273,4 +273,8 @@ cat >>"$curdir/configure.h" <<EOF
 EOF
 
 echo
-echo "You may run make now"
+if [ "$(uname -s)" = Linux ]; then
+    echo "You may run make now"
+else
+    echo "You may run gmake now"
+fi

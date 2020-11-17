@@ -97,7 +97,7 @@ jobs:
       run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
     - name: install prerequisites
-      run: sudo apt-get update && sudo apt-get install -y rsync zip jq
+      run: sudo apt-get update && sudo apt-get install -y rsync zip
 
     - name: create source zip file for rpm build
       run: |
@@ -151,9 +151,6 @@ jobs:
     - name: get release vars
       id: getvars
       run: |
-        upload_url=$(jq -r '.release.upload_url' < $GITHUB_EVENT_PATH)
-        echo "Upload URL is $upload_url"
-        echo "::set-output name=upload_url::$upload_url"
         rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
         rpmname=$(basename "$rpmpath")
         echo "RPM package name is $rpmname ($rpmpath)"
@@ -175,7 +172,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        upload_url: ${{ github.event.release.upload_url }}
         asset_path: ${{ steps.getvars.outputs.rpmpath }}
         asset_name: ${{ steps.getvars.outputs.rpmname }}
         asset_content_type: application/x-rpm
@@ -185,7 +182,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        upload_url: ${{ github.event.release.upload_url }}
         asset_path: ${{ steps.getvars.outputs.debpath }}
         asset_name: ${{ steps.getvars.outputs.debname }}
         asset_content_type: application/x-debian-package
@@ -195,7 +192,47 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.getvars.outputs.upload_url }}
+        upload_url: ${{ github.event.release.upload_url }}
         asset_path: ${{ steps.getvars.outputs.staticpath }}
         asset_name: ${{ steps.getvars.outputs.staticname }}
+        asset_content_type: application/gzip
+
+  freebsd:
+    needs: checks
+    runs-on: macos-latest
+    name: FreeBSD
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build for FreeBSD
+      id: build
+      uses: vmactions/freebsd-vm@v0.0.8
+      with:
+        usesh: true
+        run: |
+          set -ex
+          freebsd-version
+          pkg install -y gmake zstd
+          STATIC=1 ./configure
+          gmake
+          ./ttyrec -V
+          ./ttyrec -V | grep -qF "zstd[static]"
+          file ttyrec | grep -qF "statically"
+          version=$(./ttyrec -V | head -n1 | cut -d" " -f2 | grep -Eo "[0-9][A-Za-z0-9._-]+")
+          mkdir ovh-ttyrec-$version
+          strip ttyrec ttyplay ttytime
+          install ttyrec ttyplay ttytime ovh-ttyrec-$version
+          cp -va docs ovh-ttyrec-$version
+          staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
+          tar cvzf $staticname ovh-ttyrec-$version
+          echo "Static tar.gz archive name is $staticname"
+          echo "::set-output name=staticname::$staticname"
+
+    - name: upload static binary
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.build.outputs.staticname }}
+        asset_name: ${{ steps.build.outputs.staticname }}
         asset_content_type: application/gzip
