@@ -9,12 +9,8 @@ include config.mk
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),FreeBSD)
-    MANDIR ?= $(PREFIX)/man
-else
-    MANDIR ?= $(PREFIX)/share/man
-endif
+MANDIR_LOC := $(shell test \$(uname -s) = FreeBSD || echo /share)
+MANDIR ?= $(PREFIX)$(MANDIR_LOC)/man
 
 .PHONY: all deb rpm clean distclean style dist install test
 
