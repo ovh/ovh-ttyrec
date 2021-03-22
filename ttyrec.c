@@ -1551,8 +1551,11 @@ void sigterm_handler(int signal)
         // unlock_session() is also called in done(), but we need to do it first here
         // or the below message won't be visible if we happen to be locked
         unlock_session(SIGUSR2);
-        (void)puts("\r\nttyrec: ending your session, sorry (kill timeout expired, you manually typed the kill key sequence, or we got a SIGTERM).\r");
+        // terminate our subchild BEFORE printing the msg, to avoid an interlock case where
+        // our child is stuck writing to us, while we're writing to our stdout
+        // read by our caller, stuck writing to our child
         kill(subchild, SIGTERM);
+        (void)puts("\r\nttyrec: ending your session, sorry (kill timeout expired, you manually typed the kill key sequence, or we got a SIGTERM).\r");
     }
     done(EXIT_SUCCESS);
 }
