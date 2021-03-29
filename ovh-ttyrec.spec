@@ -55,6 +55,12 @@ rm -rf -- "$RPM_BUILD_ROOT"
 %{_bindir}/ttyrec
 
 %changelog
+* Mon Mar 29 2021 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.7
+- fix: rare interlocking on exit
+- enh: default install prefix is now /usr/local
+- fix: FreeBSD compilation
+- chore: autobuild for FreeBSD
+
 * Mon Nov 09 2020 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.6
 - chore: display machine triplet in -V
 
