@@ -1,6 +1,6 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.1.6.6
+Version: 1.1.6.7
 Release: 1
 License: BSD
 Group: Applications/System
