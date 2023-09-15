@@ -129,6 +129,7 @@ double ttywait(struct timeval prev, struct timeval cur, double speed)
      * Save "diff" since select(2) may overwrite it to {0, 0}.
      */
     struct timeval orig_diff = diff;
+
     select(1, &readfs, NULL, NULL, &diff);
     diff = orig_diff;              /* Restore the original diff value. */
     if (FD_ISSET(0, &readfs))      /* a user hits a character? */

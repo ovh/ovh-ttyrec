@@ -210,7 +210,7 @@ static time_t locked_since  = 0;
 static int    lock_warned   = 0;
 static int    kill_warned   = 0;
 
-static const char version[] = "1.1.6.7";
+static const char version[] = "1.1.7.0";
 
 static FILE *fscript;
 static int  child;
@@ -250,6 +250,8 @@ static int  opt_append          = 0;
 static int  opt_debug           = 0;
 static int  opt_count_bytes     = 0;
 static int  opt_cheatcodes      = 0;
+static int  opt_stealth_stdout  = 0;
+static int  opt_stealth_stderr  = 0;
 static char *opt_custom_message = NULL;
 
 static int use_tty   = 1; // no=0, yes=1
@@ -274,6 +276,12 @@ int main(int argc, char **argv)
     {
         static struct option long_options[] =
         {
+            /*
+             * "long-opt-name",   a, b, c
+             * a: 1 if requires an arg, 0 otherwise
+             * b: always 0
+             * c: an optional char for the corresponding short-option, 0 otherwise
+             */
             { "zstd",             0, 0, 0   },
             { "level",            1, 0, 'l' },
             { "verbose",          0, 0, 'v' },
@@ -290,6 +298,8 @@ int main(int argc, char **argv)
             { "msg",              1, 0, 's' },
             { "count-bytes",      0, 0, 'n' },
             { "term",             1, 0, 'T' },
+            { "stealth-stdout",   0, 0, 0   },
+            { "stealth-stderr",   0, 0, 0   },
             { "version",          0, 0, 'V' },
             { "help",             0, 0, 'h' },
             { "max-flush-time",   1, 0, 0   },
@@ -355,6 +365,14 @@ int main(int argc, char **argv)
                     fprintf(stderr, "Invalid value passed to --%s (%s), expected a strictly positive integer\r\n", long_options[option_index].name, optarg);
                     exit(EXIT_FAILURE);
                 }
+            }
+            else if (strcmp(long_options[option_index].name, "stealth-stdout") == 0)
+            {
+                opt_stealth_stdout = 1;
+            }
+            else if (strcmp(long_options[option_index].name, "stealth-stderr") == 0)
+            {
+                opt_stealth_stderr = 1;
             }
             else
             {
@@ -1168,6 +1186,7 @@ void lock_session(int signal)
 
     char           hostname[BUFSIZ];
     struct utsname name;
+
     if (uname(&name))
     {
         hostname[0] = '\0';
@@ -1186,6 +1205,7 @@ void lock_session(int signal)
         "Sincerely yours",    "Take care",
         "Cheers",             "With deepest sympathy",
     };
+
 #define salute_len    (sizeof(salute) / sizeof(const char *))
 
     // save cursor pos, save buffer, clear screen, put cursor at home position, hide cursor
@@ -1322,6 +1342,7 @@ void dooutput(void)
     for ( ; ;)
     {
         Header h;
+        int    dont_write = 0;
 
         // we have a tty
         if (use_tty)
@@ -1388,6 +1409,10 @@ void dooutput(void)
                     current_fd_name = "stderr";
                     pipe_flag       = &stderr_pipe_opened;
                     target_fd       = 2; // stderr
+                    if (opt_stealth_stderr)
+                    {
+                        dont_write = 1;  // don't write buffer to ttyrec file, see below
+                    }
                 }
                 else if (FD_ISSET(stdout_pipe[0], &rfds))
                 {
@@ -1395,6 +1420,10 @@ void dooutput(void)
                     current_fd_name = "stdout";
                     pipe_flag       = &stdout_pipe_opened;
                     target_fd       = 1; // stdout
+                    if (opt_stealth_stdout)
+                    {
+                        dont_write = 1;  // don't write buffer to ttyrec file, see below
+                    }
                 }
                 else
                 {
@@ -1450,8 +1479,11 @@ void dooutput(void)
                     break;
                 }
             }
-            (void)write_header(fscript, &h);
-            (void)fwrite_wrapper(obuf, 1, cc, fscript);
+            if (!dont_write)
+            {
+                (void)write_header(fscript, &h);
+                (void)fwrite_wrapper(obuf, 1, cc, fscript);
+            }
             bytes_out    += cc;
             last_activity = time(NULL);
             lock_warned   = 0;
@@ -2087,6 +2119,8 @@ void help(void)
             "  -T, --term MODE           MODE can be either 'never' (never allocate a pseudotty, even if stdin is a tty, and use pipes to\n"    \
             "                              handle stdout/stderr instead), 'always' (always allocate a pseudotty, even if stdin is not a tty)\n" \
             "                              or 'auto' (default, allocate a pseudotty if stdin is a tty, uses pipes otherwise)\n"                 \
+            "      --stealth-stdout      when no pseudotty is allocated, don't record stdout\n"                                                 \
+            "      --stealth-stderr      when no pseudotty is allocated, don't record stderr\n"                                                 \
             "  -v, --verbose             verbose (debug) mode, use twice for more verbosity\n"                                                  \
             "  -V, --version             show version information\n"                                                                            \
             "  -e, --shell-cmd CMD       enables legacy compatibility mode and specifies the command to be run under the user's $SHELL -c\n"    \
