@@ -41,6 +41,7 @@ jobs:
 
     - name: compile with zstd autodetection (none)
       run: |
+        sudo apt-get remove --purge -y libzstd-dev
         make clean && ./configure && make -j$(nproc) && ./ttyrec -V
         if ./ttyrec -V | grep -qF 'zstd'; then
             exit 1
