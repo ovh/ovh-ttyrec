@@ -1,6 +1,6 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.1.6.7
+Version: 1.1.7.0
 Release: 1
 License: BSD
 Group: Applications/System
@@ -55,6 +55,9 @@ rm -rf -- "$RPM_BUILD_ROOT"
 %{_bindir}/ttyrec
 
 %changelog
+* Fri Sep 15 2023 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.7.0
+- feat: add --stealth-stdout and --stealth-stderr
+
 * Mon Mar 29 2021 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.6.7
 - fix: rare interlocking on exit
 - enh: default install prefix is now /usr/local

@@ -1,3 +1,9 @@
+ovh-ttyrec (1.1.7.0) master; urgency=medium
+
+  * feat: add --stealth-stdout and --stealth-stderr
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Fri, 15 Sep 2023 15:39:33 +0200
+
 ovh-ttyrec (1.1.6.7) master; urgency=medium
 
   * fix: rare interlocking on exit

@@ -65,7 +65,8 @@ size_t fwrite_wrapper_zstd(const void *ptr, size_t size, size_t nmemb, FILE *str
     }
 
     size_t        written = 0;
-    ZSTD_inBuffer input   = { ptr, size * nmemb, 0 };
+    ZSTD_inBuffer input   = { ptr, size *nmemb, 0 };
+
     while (input.pos < input.size)
     {
         ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
