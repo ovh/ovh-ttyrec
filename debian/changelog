@@ -1,3 +1,9 @@
+ovh-ttyrec (1.1.7.1) master; urgency=medium
+
+  * fix: ttyplay: playing zstd-compressed files created in append mode halted after first stream
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Mon, 18 Sep 2023 10:12:21 +0200
+
 ovh-ttyrec (1.1.7.0) master; urgency=medium
 
   * feat: add --stealth-stdout and --stealth-stderr

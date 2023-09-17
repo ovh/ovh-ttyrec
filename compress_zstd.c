@@ -212,6 +212,15 @@ DECOMPRESS:
     // nope we don't, alright, decompress a new chunk then
     else
     {
+        if (toRead == 0)
+        {
+            // the current stream is over, but maybe we have additional streams
+            // concatenated back-to-back in the file, such as when --append is used?
+            ZSTD_freeDStream(dstream);
+            dstream = ZSTD_createDStream();
+            toRead  = ZSTD_initDStream(dstream);
+        }
+
         size_t read = fread((void *)input.src, 1, toRead, stream);
         if (read == 0)
         {
