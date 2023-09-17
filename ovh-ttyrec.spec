@@ -1,6 +1,6 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.1.7.0
+Version: 1.1.7.1
 Release: 1
 License: BSD
 Group: Applications/System
@@ -55,6 +55,9 @@ rm -rf -- "$RPM_BUILD_ROOT"
 %{_bindir}/ttyrec
 
 %changelog
+* Mon Sep 18 2023 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.7.1
+- fix: ttyplay: playing zstd-compressed files created in append mode halted after first stream
+
 * Fri Sep 15 2023 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.7.0
 - feat: add --stealth-stdout and --stealth-stderr
 
