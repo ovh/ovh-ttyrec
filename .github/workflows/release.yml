@@ -11,7 +11,9 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - name: verify changelogs
       run: |
@@ -92,7 +94,9 @@ jobs:
           - amd64
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
     - name: prepare qemu
       run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -117,7 +121,7 @@ jobs:
         -v $PWD:/pkg/code
         -v /tmp/pkg:/pkg
         -v $HOME:/root
-        ${{ matrix.cross }}/debian
+        ${{ matrix.cross }}/debian:10
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
@@ -203,7 +207,9 @@ jobs:
     runs-on: macos-latest
     name: FreeBSD
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
     - name: Build for FreeBSD
       id: build
       uses: vmactions/freebsd-vm@v0
