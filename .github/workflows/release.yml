@@ -1,11 +1,11 @@
 name: publish release assets
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 jobs:
-
   checks:
     runs-on: ubuntu-latest
 
@@ -157,50 +157,23 @@ jobs:
       id: getvars
       run: |
         rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
-        rpmname=$(basename "$rpmpath")
-        echo "RPM package name is $rpmname ($rpmpath)"
-        echo "::set-output name=rpmname::$rpmname"
-        echo "::set-output name=rpmpath::$rpmpath"
+        echo "RPM package name is $rpmpath"
+        echo "rpmpath=$rpmpath" >> "$GITHUB_OUTPUT"
         debpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.deb" ! -name "*dbgsym*")
-        debname=$(basename "$debpath")
-        echo "Debian package name is $debname ($debpath)"
-        echo "::set-output name=debname::$debname"
-        echo "::set-output name=debpath::$debpath"
+        echo "Debian package name is $debpath"
+        echo "debpath=$debpath" >> "$GITHUB_OUTPUT"
         staticpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*-linux-static-binary.tar.gz" | head -n1)
-        staticname=$(basename "$staticpath")
-        echo "Static tar.gz archive name is $staticname ($staticpath)"
-        echo "::set-output name=staticname::$staticname"
-        echo "::set-output name=staticpath::$staticpath"
+        echo "Static tar.gz archive name is $staticpath"
+        echo "staticpath=$staticpath" >> "$GITHUB_OUTPUT"
 
-    - name: upload rpm package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.rpmpath }}
-        asset_name: ${{ steps.getvars.outputs.rpmname }}
-        asset_content_type: application/x-rpm
-
-    - name: upload debian package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.debpath }}
-        asset_name: ${{ steps.getvars.outputs.debname }}
-        asset_content_type: application/x-debian-package
-
-    - name: upload static binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.staticpath }}
-        asset_name: ${{ steps.getvars.outputs.staticname }}
-        asset_content_type: application/gzip
+        files: |
+          ${{ steps.getvars.outputs.rpmpath }}
+          ${{ steps.getvars.outputs.debpath }}
+          ${{ steps.getvars.outputs.staticpath }}
+        draft: true
 
   freebsd:
     needs: checks
@@ -211,11 +184,9 @@ jobs:
       with:
         persist-credentials: false
     - name: Build for FreeBSD
-      id: build
       uses: vmactions/freebsd-vm@v0
       with:
         usesh: true
-        sync: sshfs
         run: |
           set -ex
           freebsd-version
@@ -233,14 +204,12 @@ jobs:
           staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
           tar cvzf $staticname ovh-ttyrec-$version
           echo "Static tar.gz archive name is $staticname"
-          echo "::set-output name=staticname::$staticname"
-
-    - name: upload static binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "staticname=$staticname" >> GITHUB_OUTPUT
+    - name: Get output name from build in vm
+      id: getname
+      run: cat GITHUB_OUTPUT >> "$GITHUB_OUTPUT"
+    - name: Release
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.build.outputs.staticname }}
-        asset_name: ${{ steps.build.outputs.staticname }}
-        asset_content_type: application/gzip
+        files: ${{ steps.getname.outputs.staticname }}
+        draft: true
