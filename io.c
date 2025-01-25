@@ -132,10 +132,10 @@ int write_header(FILE *fp, Header *h)
 }
 
 
-static char *progname = "";
+static const char *progname = "";
 void set_progname(const char *name)
 {
-    progname = strdup(name);
+    progname = name;
 }
 
 
