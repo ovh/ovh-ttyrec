@@ -438,7 +438,15 @@ int main(int argc, char **argv)
             legacy    = 1;
             params    = malloc(sizeof(char *) * 4);
             command   = shell;
-            params[0] = strrchr(shell, '/') + 1;
+            params[0] = strrchr(shell, '/');
+            if (params[0])
+            {
+                params[0] += 1;
+            }
+            else
+            {
+                params[0] = shell;
+            }
             params[1] = "-c";
             params[2] = strdup(optarg);
             params[3] = NULL;
@@ -613,7 +621,15 @@ int main(int argc, char **argv)
         {
             command   = shell;
             params    = malloc(sizeof(char *) * 3);
-            params[0] = strrchr(shell, '/') + 1;
+            params[0] = strrchr(shell, '/');
+            if (params[0])
+            {
+                params[0] += 1;
+            }
+            else
+            {
+                params[0] = shell;
+            }
             params[1] = "-i";
             params[2] = NULL;
         }
