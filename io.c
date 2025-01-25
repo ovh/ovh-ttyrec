@@ -99,7 +99,7 @@ int read_header(FILE *fp, Header *h)
 {
     uint32_t buf[3], raw_usec;
 
-    if (fread_wrapper(buf, sizeof(uint32_t), 3, fp) == 0)
+    if (fread_wrapper(buf, sizeof(uint32_t), 3, fp) != 3)
     {
         return 0;
     }
