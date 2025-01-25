@@ -120,6 +120,7 @@ double ttywait(struct timeval prev, struct timeval cur, double speed)
         diff.tv_sec = diff.tv_usec = 0;
     }
 
+    FD_ZERO(&readfs);
     FD_SET(STDIN_FILENO, &readfs);
 
     /*
@@ -130,9 +131,9 @@ double ttywait(struct timeval prev, struct timeval cur, double speed)
      */
     struct timeval orig_diff = diff;
 
-    select(1, &readfs, NULL, NULL, &diff);
-    diff = orig_diff;              /* Restore the original diff value. */
-    if (FD_ISSET(0, &readfs))      /* a user hits a character? */
+    int r = select(1, &readfs, NULL, NULL, &diff);
+    diff = orig_diff;                    /* Restore the original diff value. */
+    if ((r > 0) && FD_ISSET(0, &readfs)) /* a user hits a character? */
     {
         char c;
         if (read(STDIN_FILENO, &c, 1) == 1)
