@@ -185,9 +185,14 @@ double ttynowait(struct timeval prev, struct timeval cur, double speed)
 
 int ttyread(FILE *fp, Header *h, char **buf)
 {
+    fpos_t pos;
+    int    can_seek = fgetpos(fp, &pos) == 0;
+
+    clearerr(fp);
+
     if (read_header(fp, h) == 0)
     {
-        return 0;
+        goto err;
     }
 
     *buf = malloc(h->len);
@@ -199,9 +204,24 @@ int ttyread(FILE *fp, Header *h, char **buf)
 
     if (fread_wrapper(*buf, 1, h->len, fp) == 0)
     {
-        perror("fread");
+        goto err;
     }
     return 1;
+
+err:
+    if (ferror(fp))
+    {
+        perror("fread");
+    }
+    else
+    {
+        /* Short read. Seek back to before header, to set up for retry. */
+        if (can_seek)
+        {
+            fsetpos(fp, &pos);
+        }
+    }
+    return 0;
 }
 
 
