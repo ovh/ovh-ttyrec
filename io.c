@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -65,7 +66,7 @@ static int is_little_endian(void)
         char *p  = (char *)&n;
         char x[] = { 1, 0, 0, 0 };
 
-        assert(sizeof(int) == 4);
+        _Static_assert(sizeof(int) == 4, "Check relies on int size");
 
         if (memcmp(p, x, 4) == 0)
         {
@@ -81,7 +82,7 @@ static int is_little_endian(void)
 }
 
 
-static int convert_to_little_endian(int x)
+static uint32_t convert_to_little_endian(uint32_t x)
 {
     if (is_little_endian())
     {
@@ -96,15 +97,16 @@ static int convert_to_little_endian(int x)
 
 int read_header(FILE *fp, Header *h)
 {
-    int buf[3];
+    uint32_t buf[3], raw_usec;
 
-    if (fread_wrapper(buf, sizeof(int), 3, fp) == 0)
+    if (fread_wrapper(buf, sizeof(uint32_t), 3, fp) == 0)
     {
         return 0;
     }
 
-    h->tv.tv_sec  = convert_to_little_endian(buf[0]);
-    h->tv.tv_usec = convert_to_little_endian(buf[1]);
+    raw_usec      = convert_to_little_endian(buf[1]);
+    h->tv.tv_sec  = convert_to_little_endian(buf[0]) | ((raw_usec & 0xfff00000ull) << 12);
+    h->tv.tv_usec = raw_usec & 0x000fffffU;
     h->len        = convert_to_little_endian(buf[2]);
 
     return 1;
@@ -113,13 +115,15 @@ int read_header(FILE *fp, Header *h)
 
 int write_header(FILE *fp, Header *h)
 {
-    int buf[3];
+    uint32_t buf[3];
 
-    buf[0] = convert_to_little_endian(h->tv.tv_sec);
-    buf[1] = convert_to_little_endian(h->tv.tv_usec);
+    // The reasonable range of tv_usec is [0, 999999], which is [0, 0x00`0F`42`3F]
+    // Thus, we can stuff 3 nibbles from tv_sec into the top bits, giving us a range of dates up to around year 559444
+    buf[0] = convert_to_little_endian(h->tv.tv_sec & 0xffffffffU);
+    buf[1] = convert_to_little_endian(h->tv.tv_usec | ((h->tv.tv_sec & 0x00000fff00000000ull) >> 12));
     buf[2] = convert_to_little_endian(h->len);
 
-    if (fwrite_wrapper(buf, sizeof(int), 3, fp) == 0)
+    if (fwrite_wrapper(buf, sizeof(uint32_t), 3, fp) == 0)
     {
         return 0;
     }

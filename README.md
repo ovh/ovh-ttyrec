@@ -31,6 +31,7 @@ It should work under any POSIX OS that support either `openpty()` or the `grantp
 - Supports a no-tty mode, relying on pipes instead of pseudottys, while still recording stdout/stderr
 - Automatically detects whether to use pseudottys or pipes, also overridable from command-line
 - Supports reporting the number of bytes that were output to the terminal on session exit
+- Format extended to support dates up to 0xFFFFFFFFFFF
 
 ## compilation
 
