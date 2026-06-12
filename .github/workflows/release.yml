@@ -109,7 +109,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        persist-credentials: false
+        persist-credentials: true
 
     - name: prepare qemu
       run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -222,7 +222,8 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        persist-credentials: false
+        persist-credentials: true
+
     - name: Build for FreeBSD
       id: build
       uses: vmactions/freebsd-vm@v0
