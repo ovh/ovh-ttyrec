@@ -11,10 +11,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
 
   checks:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
 
@@ -88,6 +92,8 @@ jobs:
   multiarch:
     needs: checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         cross:
@@ -211,6 +217,8 @@ jobs:
     needs: checks
     runs-on: macos-latest
     name: FreeBSD
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v6
       with:

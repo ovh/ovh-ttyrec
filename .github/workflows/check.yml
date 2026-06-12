@@ -2,11 +2,15 @@ name: basic checks
 
 on: [pull_request, push]
 
+permissions: {}
+
 jobs:
 
   check:
     # don't use ubuntu-current here, so that we get a known version of uncrustify
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
 
     steps:
 
