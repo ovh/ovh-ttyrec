@@ -172,18 +172,18 @@ jobs:
         rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
         rpmname=$(basename "$rpmpath")
         echo "RPM package name is $rpmname ($rpmpath)"
-        echo "::set-output name=rpmname::$rpmname"
-        echo "::set-output name=rpmpath::$rpmpath"
+        echo "rpmname=$rpmname" >> "$GITHUB_OUTPUT"
+        echo "rpmpath=$rpmpath" >> "$GITHUB_OUTPUT"
         debpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.deb" ! -name "*dbgsym*")
         debname=$(basename "$debpath")
         echo "Debian package name is $debname ($debpath)"
-        echo "::set-output name=debname::$debname"
-        echo "::set-output name=debpath::$debpath"
+        echo "debname=$debname" >> "$GITHUB_OUTPUT"
+        echo "debpath=$debpath" >> "$GITHUB_OUTPUT"
         staticpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*-linux-static-binary.tar.gz" | head -n1)
         staticname=$(basename "$staticpath")
         echo "Static tar.gz archive name is $staticname ($staticpath)"
-        echo "::set-output name=staticname::$staticname"
-        echo "::set-output name=staticpath::$staticpath"
+        echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
+        echo "staticpath=$staticpath" >> "$GITHUB_OUTPUT"
 
     - name: Tag for Continuous Build
       if: github.ref_name == 'master'
@@ -198,7 +198,10 @@ jobs:
         prerelease: true
         name: "Continuous Build"
         tag_name: continuous
-        files: ${{ steps.dist.outputs.archive }}
+        files: |
+          ${{ steps.getvars.outputs.rpmpath }}
+          ${{ steps.getvars.outputs.debpath }}
+          ${{ steps.getvars.outputs.staticpath }}
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
@@ -249,7 +252,7 @@ jobs:
           staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
           tar cvzf $staticname ovh-ttyrec-$version
           echo "Static tar.gz archive name is $staticname"
-          echo "::set-output name=staticname::$staticname"
+          echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
 
     - name: Tag for Continuous Build
       if: github.ref_name == 'master'
