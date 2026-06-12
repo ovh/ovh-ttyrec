@@ -49,11 +49,11 @@
 #include "compress.h"
 
 #define SWAP_ENDIAN(val)                                             \
-    ((unsigned int)(                                                 \
-         (((unsigned int)(val) & (unsigned int)0x000000ffU) << 24) | \
-         (((unsigned int)(val) & (unsigned int)0x0000ff00U) << 8) |  \
-         (((unsigned int)(val) & (unsigned int)0x00ff0000U) >> 8) |  \
-         (((unsigned int)(val) & (unsigned int)0xff000000U) >> 24)))
+        ((unsigned int)(                                                 \
+             (((unsigned int)(val) & (unsigned int)0x000000ffU) << 24) | \
+             (((unsigned int)(val) & (unsigned int)0x0000ff00U) << 8) |  \
+             (((unsigned int)(val) & (unsigned int)0x00ff0000U) >> 8) |  \
+             (((unsigned int)(val) & (unsigned int)0xff000000U) >> 24)))
 
 static int is_little_endian(void)
 {

@@ -318,11 +318,11 @@ FILE *input_from_stdin(void)
 
 int main(int argc, char **argv)
 {
-    double         speed = 1.0;
+    double         speed     = 1.0;
     ReadFunc       read_func = ttyread;
     WaitFunc       wait_func = ttywait;
-    ProcessFunc    process = ttyplayback;
-    FILE           *input = NULL;
+    ProcessFunc    process   = ttyplayback;
+    FILE           *input    = NULL;
     struct termios old, new;
 
     set_progname(argv[0]);
