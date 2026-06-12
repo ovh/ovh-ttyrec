@@ -100,7 +100,6 @@ jobs:
           - platform: linux/arm/v5
           - platform: linux/arm/v7
           - platform: linux/arm64/v8
-          - platform: linux/ppc64le
           - platform: linux/mips64le
           - platform: linux/s390x
           - platform: linux/386
