@@ -134,11 +134,16 @@ double ttywait(struct timeval prev, struct timeval cur, double speed)
     diff = orig_diff;              /* Restore the original diff value. */
     if (FD_ISSET(0, &readfs))      /* a user hits a character? */
     {
-        char c;
-        if (read(STDIN_FILENO, &c, 1) == 1)
+        char c[32];
+
+        /* If the read size is == 1, it's *probably* a human typing
+         * to change ttyplay's behavior, and not the term answering
+         * to a control code sent by the running program (e.g. vim)
+         */
+        if (read(STDIN_FILENO, c, 32) == 1)
         {
             /* drain the character */
-            switch (c)
+            switch (c[0])
             {
             case '+':
             case 'f':
