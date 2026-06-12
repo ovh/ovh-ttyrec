@@ -96,15 +96,23 @@ jobs:
       contents: write
     strategy:
       matrix:
-        cross:
-          - arm32v5
-          - arm32v7
-          - arm64v8
-          - ppc64le
-          - mips64le
-          - s390x
-          - i386
-          - amd64
+        include:
+          - cross: arm32v5
+            platform: linux/arm/v5
+          - cross: arm32v7
+            platform: linux/arm/v7
+          - cross: arm64v8
+            platform: linux/arm64/v8
+          - cross: ppc64le
+            platform: linux/ppc64le
+          - cross: mips64le
+            platform: linux/mips64le
+          - cross: s390x
+            platform: linux/s390x
+          - cross: i386
+            platform: linux/386
+          - cross: amd64
+            platform: linux/amd64
 
     steps:
     - uses: actions/checkout@v6
@@ -130,11 +138,11 @@ jobs:
     - name: build for ${{ matrix.cross }}
       run: >
         mkdir /tmp/pkg &&
-        docker run --rm -e DEBIAN_FRONTEND=noninteractive
+        docker run --rm --platform=${{ matrix.platform }} -e DEBIAN_FRONTEND=noninteractive
         -v $PWD:/pkg/code
         -v /tmp/pkg:/pkg
         -v $HOME:/root
-        ${{ matrix.cross }}/debian:11
+        debian:11
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
