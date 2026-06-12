@@ -134,7 +134,7 @@ jobs:
         -v $PWD:/pkg/code
         -v /tmp/pkg:/pkg
         -v $HOME:/root
-        ${{ matrix.cross }}/debian:10
+        ${{ matrix.cross }}/debian:11
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
