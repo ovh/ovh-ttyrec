@@ -1959,15 +1959,15 @@ void print_termios_info(int fd, const char *prefix)
             dbgline[0] = '\0';
             snprintf(dbgline, BUFSIZ, "%25s: i=%05lo o=%03lo c=%05lo l=%06lo, i: ", prefix, (unsigned long)t.c_iflag, (unsigned long)t.c_oflag, (unsigned long)t.c_cflag, (unsigned long)t.c_lflag);
 #define IFLAG(f)                                                                                \
-    if (t.c_iflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); \
-    }
+        if (t.c_iflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); \
+        }
 #define OFLAG(f)    if (t.c_oflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
 #define CFLAG(f)    if (t.c_cflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
 #define LFLAG(f)    if (t.c_lflag & f) { strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); }
 
 #define CSWITCH(f) \
-case f:            \
-    strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); break;
+        case f:            \
+            strncat(dbgline + strlen(dbgline), # f " ", BUFSIZ - strlen(dbgline)); break;
             IFLAG(IGNBRK);
             IFLAG(BRKINT);
             IFLAG(IGNPAR);
@@ -2008,28 +2008,28 @@ case f:            \
             strncat(dbgline + strlen(dbgline), "c: ", BUFSIZ - strlen(dbgline));
             switch (t.c_cflag & B38400)
             {
-                CSWITCH(B38400);
-                CSWITCH(B19200);
-                CSWITCH(B9600);
-                CSWITCH(B4800);
-                CSWITCH(B2400);
-                CSWITCH(B1200);
-                CSWITCH(B600);
-                CSWITCH(B300);
-                CSWITCH(B150);
-                CSWITCH(B75);
-                CSWITCH(B50);
-                CSWITCH(B0);
+            CSWITCH(B38400);
+            CSWITCH(B19200);
+            CSWITCH(B9600);
+            CSWITCH(B4800);
+            CSWITCH(B2400);
+            CSWITCH(B1200);
+            CSWITCH(B600);
+            CSWITCH(B300);
+            CSWITCH(B150);
+            CSWITCH(B75);
+            CSWITCH(B50);
+            CSWITCH(B0);
             }
             switch (t.c_cflag & CSIZE)
             {
-                CSWITCH(CS8);
-                CSWITCH(CS7);
+            CSWITCH(CS8);
+            CSWITCH(CS7);
 #if (CS6 != CS5) && (CS6 != CS7) && (CS6 != CS8) /* Haiku defines CS4 and CS5 to 0x00 */
-                CSWITCH(CS6);
+            CSWITCH(CS6);
 #endif
 #if (CS5 != CS6) && (CS5 != CS7) && (CS5 != CS8)
-                CSWITCH(CS5);
+            CSWITCH(CS5);
 #endif
             }
             CFLAG(CSTOPB);

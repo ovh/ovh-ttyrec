@@ -5,11 +5,14 @@ on: [pull_request, push]
 jobs:
 
   check:
-    runs-on: ubuntu-latest
+    # don't use ubuntu-current here, so that we get a known version of uncrustify
+    runs-on: ubuntu-24.04
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
+      with:
+          persist-credentials: false
 
     - name: verify debian changelog
       run: |
