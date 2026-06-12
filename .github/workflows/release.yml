@@ -97,22 +97,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - cross: arm32v5
-            platform: linux/arm/v5
-          - cross: arm32v7
-            platform: linux/arm/v7
-          - cross: arm64v8
-            platform: linux/arm64/v8
-          - cross: ppc64le
-            platform: linux/ppc64le
-          - cross: mips64le
-            platform: linux/mips64le
-          - cross: s390x
-            platform: linux/s390x
-          - cross: i386
-            platform: linux/386
-          - cross: amd64
-            platform: linux/amd64
+          - platform: linux/arm/v5
+          - platform: linux/arm/v7
+          - platform: linux/arm64/v8
+          - platform: linux/ppc64le
+          - platform: linux/mips64le
+          - platform: linux/s390x
+          - platform: linux/386
+          - platform: linux/amd64
 
     steps:
     - uses: actions/checkout@v6
@@ -135,21 +127,21 @@ jobs:
         mkdir -p ~/rpmbuild/SOURCES
         zip -9r ~/rpmbuild/SOURCES/master.zip ovh-ttyrec
 
-    - name: build for ${{ matrix.cross }}
+    - name: build for ${{ matrix.platform }}
       run: >
         mkdir /tmp/pkg &&
         docker run --rm --platform=${{ matrix.platform }} -e DEBIAN_FRONTEND=noninteractive
         -v $PWD:/pkg/code
         -v /tmp/pkg:/pkg
         -v $HOME:/root
-        debian:11
+        debian/eol:bullseye
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
-          apt-get install -y make build-essential libzstd-dev dpkg-dev debhelper unzip rpm binutils;
+          apt-get install -y make build-essential libzstd-dev debhelper unzip rpm binutils;
           cd /pkg/code;
           dpkg-buildpackage -b -rfakeroot -us -uc;
-          if [ "${{ matrix.cross }}" = i386 ]; then target="--target=i386"; else target=""; fi
+          if [ "${{ matrix.platform }}" = linux/386 ]; then target="--target=i386"; else target=""; fi
           set +o pipefail;
           rpm --showrc | head;
           set -o pipefail;
