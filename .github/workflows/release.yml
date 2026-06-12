@@ -134,7 +134,7 @@ jobs:
         -v $PWD:/pkg/code
         -v /tmp/pkg:/pkg
         -v $HOME:/root
-        debian/eol:bullseye
+        debian/eol:buster
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
