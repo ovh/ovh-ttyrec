@@ -215,8 +215,9 @@ jobs:
 
   freebsd:
     needs: checks
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     name: FreeBSD
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -225,15 +226,16 @@ jobs:
         persist-credentials: true
 
     - name: Build for FreeBSD
-      id: build
-      uses: vmactions/freebsd-vm@v0
+      uses: cross-platform-actions/action@master
       with:
-        usesh: true
-        sync: sshfs
+        operating_system: freebsd
+        version: '14.3'
+        shell: bash
+        sync_files: runner-to-vm
         run: |
           set -ex
           freebsd-version
-          pkg install -y gmake zstd
+          sudo env pkg install -y gmake zstd
           STATIC=1 ./configure
           gmake
           ./ttyrec -V
