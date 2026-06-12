@@ -1,8 +1,15 @@
 name: publish release assets
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - 'master'
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
 
@@ -11,7 +18,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         persist-credentials: false
 
@@ -94,7 +101,7 @@ jobs:
           - amd64
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         persist-credentials: false
 
@@ -125,7 +132,7 @@ jobs:
         /bin/bash -c '
           set -exo pipefail;
           apt-get update;
-          apt-get install -y make gcc libzstd-dev dpkg-dev debhelper unzip rpm binutils;
+          apt-get install -y make build-essential libzstd-dev dpkg-dev debhelper unzip rpm binutils;
           cd /pkg/code;
           dpkg-buildpackage -b -rfakeroot -us -uc;
           if [ "${{ matrix.cross }}" = i386 ]; then target="--target=i386"; else target=""; fi
@@ -172,42 +179,40 @@ jobs:
         echo "::set-output name=staticname::$staticname"
         echo "::set-output name=staticpath::$staticpath"
 
-    - name: upload rpm package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Tag for Continuous Build
+      if: github.ref_name == 'master'
+      run: |
+        git tag -f continuous
+        git push -f origin continuous
+    - name: Upload to Continuous Build
+      if: github.ref_name == 'master'
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.rpmpath }}
-        asset_name: ${{ steps.getvars.outputs.rpmname }}
-        asset_content_type: application/x-rpm
+        token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: true
+        name: "Continuous Build"
+        tag_name: continuous
+        files: ${{ steps.dist.outputs.archive }}
 
-    - name: upload debian package
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload to Draft Release
+      if: github.ref_type == 'tag'
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.debpath }}
-        asset_name: ${{ steps.getvars.outputs.debname }}
-        asset_content_type: application/x-debian-package
-
-    - name: upload static binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.getvars.outputs.staticpath }}
-        asset_name: ${{ steps.getvars.outputs.staticname }}
-        asset_content_type: application/gzip
+        token: "${{ secrets.GITHUB_TOKEN }}"
+        draft: true
+        name: ${{ github.ref_name }}
+        tag_name: ${{ github.ref_name }}
+        files: |
+          ${{ steps.getvars.outputs.rpmpath }}
+          ${{ steps.getvars.outputs.debpath }}
+          ${{ steps.getvars.outputs.staticpath }}
 
   freebsd:
     needs: checks
     runs-on: macos-latest
     name: FreeBSD
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         persist-credentials: false
     - name: Build for FreeBSD
@@ -235,12 +240,29 @@ jobs:
           echo "Static tar.gz archive name is $staticname"
           echo "::set-output name=staticname::$staticname"
 
-    - name: upload static binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Tag for Continuous Build
+      if: github.ref_name == 'master'
+      run: |
+        git tag -f continuous
+        git push -f origin continuous
+    - name: Upload to Continuous Build
+      if: github.ref_name == 'master'
+      uses: softprops/action-gh-release@v2
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.build.outputs.staticname }}
-        asset_name: ${{ steps.build.outputs.staticname }}
-        asset_content_type: application/gzip
+        token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: true
+        name: "Continuous Build"
+        tag_name: continuous
+        files: |
+          ${{ steps.build.outputs.staticname }}
+
+    - name: Upload to Draft Release
+      if: github.ref_type == 'tag'
+      uses: softprops/action-gh-release@v2
+      with:
+        token: "${{ secrets.GITHUB_TOKEN }}"
+        draft: true
+        name: ${{ github.ref_name }}
+        tag_name: ${{ github.ref_name }}
+        files: |
+          ${{ steps.build.outputs.staticname }}

@@ -24,7 +24,7 @@ jobs:
         fi
 
     - name: install prerequisites
-      run: sudo apt-get install -y uncrustify make git debhelper
+      run: sudo apt-get install -y uncrustify make git debhelper build-essential
 
     - name: check style
       run: |
