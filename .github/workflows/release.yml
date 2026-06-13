@@ -100,6 +100,7 @@ jobs:
           - platform: linux/arm/v5
           - platform: linux/arm/v7
           - platform: linux/arm64/v8
+          - platform: linux/ppc64le
           - platform: linux/mips64le
           - platform: linux/s390x
           - platform: linux/386
@@ -139,30 +140,34 @@ jobs:
           apt-get update;
           apt-get install -y make build-essential libzstd-dev debhelper unzip rpm binutils;
           cd /pkg/code;
-          dpkg-buildpackage -b -rfakeroot -us -uc;
+          for trydeb in $(seq 1 10); do dpkg-buildpackage -b -rfakeroot -us -uc && break; done;
           if [ "${{ matrix.platform }}" = linux/386 ]; then target="--target=i386"; else target=""; fi
           set +o pipefail;
           rpm --showrc | head;
           set -o pipefail;
           if [ $(rpm -E "%{_arch}") != "%{_arch}" ]; then
-            rpmbuild -bb $target ovh-ttyrec.spec;
+            for tryrpm in $(seq 1 10); do rpmbuild -bb $target ovh-ttyrec.spec && break; done;
           else
             arch=$(rpm --showrc | grep "^build arch" | awk "{print \$4}");
-            rpmbuild --define "_arch $arch" -bb $target ovh-ttyrec.spec;
+            for tryrpm in $(seq 1 10); do rpmbuild --define "_arch $arch" -bb $target ovh-ttyrec.spec && break; done;
           fi;
           mv ~/rpmbuild/RPMS/*/*.rpm /pkg;
-          STATIC=1 ./configure && make clean && make -j$(nproc) && ./ttyrec -V;
+          for trybin in $(seq 1 10); do
+            make clean || true;
+            STATIC=1 ./configure && make clean && make -j$(nproc) && ./ttyrec -V && break;
+          done;
           ./ttyrec -V | grep -qF "zstd[static]";
           if ldd ttyrec; then
             exit 1;
           fi;
-          version=$(./ttyrec -V | head -n1 | cut -d" " -f2 | grep -Eo "[0-9][A-Za-z0-9._-]+");
+          version=$(./ttyrec -V | grep -m 1 -Eo "ttyrec v[.0-9]+" | cut -c9-);
           mkdir ovh-ttyrec-$version;
           strip ttyrec ttyplay ttytime;
           install ttyrec ttyplay ttytime ovh-ttyrec-$version;
           cp -va docs ovh-ttyrec-$version;
           staticname=ovh-ttyrec-${version}_$(dpkg --print-architecture)-linux-static-binary.tar.gz;
           tar cvzf /pkg/$staticname ovh-ttyrec-$version;
+          echo finished building with trybin=$trybin trydeb=$trydeb tryrpm=$tryrpm
           '
 
     - name: get release vars
@@ -234,24 +239,26 @@ jobs:
         version: '14.3'
         shell: bash
         sync_files: runner-to-vm
-        run: |
-          set -ex
-          freebsd-version
-          sudo env pkg install -y gmake zstd
-          STATIC=1 ./configure
-          gmake
-          ./ttyrec -V
-          ./ttyrec -V | grep -qF "zstd[static]"
-          file ttyrec | grep -qF "statically"
-          version=$(./ttyrec -V | head -n1 | cut -d" " -f2 | grep -Eo "[0-9][A-Za-z0-9._-]+")
-          mkdir ovh-ttyrec-$version
-          strip ttyrec ttyplay ttytime
-          install ttyrec ttyplay ttytime ovh-ttyrec-$version
-          cp -va docs ovh-ttyrec-$version
-          staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
-          tar cvzf $staticname ovh-ttyrec-$version
-          echo "Static tar.gz archive name is $staticname"
-          echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
+    - name: Build for FreeBSD
+      shell: cpa.sh {0}
+      run: |
+        set -ex
+        freebsd-version
+        sudo env pkg install -y gmake zstd
+        STATIC=1 ./configure
+        gmake
+        ./ttyrec -V
+        ./ttyrec -V | grep -qF "zstd[static]"
+        file ttyrec | grep -qF "statically"
+        version=$(./ttyrec -V | grep -m 1 -Eo "ttyrec v[.0-9]+" | cut -c9-);
+        mkdir ovh-ttyrec-$version
+        strip ttyrec ttyplay ttytime
+        install ttyrec ttyplay ttytime ovh-ttyrec-$version
+        cp -va docs ovh-ttyrec-$version
+        staticname=ovh-ttyrec-${version}_$(uname -m)-freebsd-static-binary.tar.gz
+        tar cvzf $staticname ovh-ttyrec-$version
+        echo "Static tar.gz archive name is $staticname"
+        echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
 
     - name: Tag for Continuous Build
       if: github.ref_name == 'master'
