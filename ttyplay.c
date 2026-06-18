@@ -52,6 +52,9 @@
 #include "compress.h"
 #include "configure.h"
 
+// Upper sanity bound on a record length read from a (possibly corrupt) file.
+#define MAX_RECORD_LEN    (16 * 1024 * 1024)
+
 typedef double (*WaitFunc) (struct timeval prev,
                             struct timeval cur,
                             double         speed);
@@ -188,6 +191,7 @@ double ttynowait(struct timeval prev, struct timeval cur, double speed)
 }
 
 
+/* returns 0 on error */
 int ttyread(FILE *fp, Header *h, char **buf)
 {
     fpos_t pos;
@@ -200,15 +204,28 @@ int ttyread(FILE *fp, Header *h, char **buf)
         goto err;
     }
 
+    if ((h->len <= 0) || (h->len > MAX_RECORD_LEN))
+    {
+        /* corrupt/invalid record length: a valid record has 1 <= len <= MAX_RECORD_LEN.
+         * reject it instead of feeding a negative (huge) or implausibly large size to malloc. */
+        fprintf(stderr, "invalid record length %d\n", h->len);
+        return 0;
+    }
+
     *buf = malloc(h->len);
     if (*buf == NULL)
     {
         perror("malloc");
-        return 1;
+        return 0;
     }
 
-    if (fread_wrapper(*buf, 1, h->len, fp) == 0)
+    if (fread_wrapper(*buf, 1, h->len, fp) != (size_t)h->len)
     {
+        /* short read (truncated/partial record): free the buffer we won't use and fall through
+         * to the seek-back/retry path.
+         */
+        free(*buf);
+        *buf = NULL;
         goto err;
     }
     return 1;
