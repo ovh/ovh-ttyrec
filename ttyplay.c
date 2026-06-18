@@ -361,12 +361,11 @@ int main(int argc, char **argv)
         switch (ch)
         {
         case 's':
-            if (optarg == NULL)
+            if ((optarg == NULL) || (sscanf(optarg, "%lf", &speed) != 1) || (speed <= 0))
             {
-                perror("-s option requires an argument");
+                fprintf(stderr, "-s option requires a strictly positive number\n");
                 exit(EXIT_FAILURE);
             }
-            sscanf(optarg, "%lf", &speed);
             break;
 
         case 'n':
