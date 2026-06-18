@@ -393,10 +393,10 @@ int main(int argc, char **argv)
         case 'l':
             errno = 0;
             opt_compress_level = strtol(optarg, NULL, 10);
-            if ((errno != 0) || (opt_compress_level <= 0))
+            if ((errno != 0) || (opt_compress_level < 1) || (opt_compress_level > 19))
             {
                 help();
-                fprintf(stderr, "Invalid value passed to -%c (%s), expected a strictly positive integer\r\n", (char)ch, optarg);
+                fprintf(stderr, "Invalid value passed to -%c (%s), expected an integer between 1 and 19\r\n", (char)ch, optarg);
                 exit(EXIT_FAILURE);
             }
             printdbg("level %c=%ld\r\n", ch, opt_compress_level);
