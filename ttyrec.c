@@ -293,7 +293,7 @@ int main(int argc, char **argv)
             { "output",           1, 0, 'f' },
             { "uuid",             1, 0, 'z' },
             { "no-openpty",       0, 0, 'p' },
-            { "lock-timeout",     1, 0, 'l' },
+            { "lock-timeout",     1, 0, 't' },
             { "kill-timeout",     1, 0, 'k' },
             { "msg",              1, 0, 's' },
             { "count-bytes",      0, 0, 'n' },
