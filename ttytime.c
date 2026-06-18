@@ -52,19 +52,26 @@ int calc_time(const char *filename)
     Header start, end;
     FILE   *fp = efopen(filename, "r");
 
-    read_header(fp, &start);
-    end.tv.tv_sec = start.tv.tv_sec; // to avoid can-be-uninit warning
+    // empty or corrupt file: no first record, so no duration to compute
+    if ((read_header(fp, &start) == 0) || (start.len < 0))
+    {
+        fclose(fp);
+        return 0;
+    }
+    end = start;
     fseek(fp, start.len, SEEK_CUR);
     while (1)
     {
         Header h;
-        if (read_header(fp, &h) == 0)
+        // stop on EOF or on a negative length (which would seek backwards and loop forever)
+        if ((read_header(fp, &h) == 0) || (h.len < 0))
         {
             break;
         }
         end = h;
         fseek(fp, h.len, SEEK_CUR);
     }
+    fclose(fp);
     return end.tv.tv_sec - start.tv.tv_sec;
 }
 
