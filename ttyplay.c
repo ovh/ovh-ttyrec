@@ -414,7 +414,8 @@ int main(int argc, char **argv)
     {
         input = efopen(argv[optind], "r");
 #ifdef HAVE_zstd
-        if (strstr(argv[optind], ".zst") == argv[optind] + strlen(argv[optind]) - 4)
+        size_t namelen = strlen(argv[optind]);
+        if ((namelen >= 4) && (strcmp(argv[optind] + namelen - 4, ".zst") == 0))
         {
             set_compress_mode(COMPRESS_ZSTD);
         }
