@@ -306,7 +306,6 @@ int main(int argc, char **argv)
             { "name-format",      1, 0, 'F' },
             { "warn-before-lock", 1, 0, 0   },
             { "warn-before-kill", 1, 0, 0   },
-            { "help",             0, 0, 'h' },
             { "usage",            0, 0, 'h' },
             { 0,                  0, 0, 0   }
         };
