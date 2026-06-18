@@ -1089,6 +1089,25 @@ void swing_output_file(int signal)
 
     if (subchild != 0)
     {
+        // we are the child: we're the one doing the file rotation.
+        //
+        // coalesce duplicate near-simultaneous requests: "pkill -USR1 ttyrec" delivers the
+        // signal to both the parent and us, and the parent forwards it to us as well
+        static struct timeval last_rotate = { 0, 0 };
+        struct timeval        now;
+        gettimeofday(&now, NULL);
+        // only compute the elapsed time once we have a previous rotation to compare against
+        if (last_rotate.tv_sec != 0)
+        {
+            long elapsed_ms = (now.tv_sec - last_rotate.tv_sec) * 1000 + (now.tv_usec - last_rotate.tv_usec) / 1000;
+            if (elapsed_ms < 250)
+            {
+                // multiple signal received in a short amount of time, only rotate once.
+                return;
+            }
+        }
+        last_rotate = now;
+
         set_ttyrec_file_name(&newname);
 
         fclose_wrapper(fscript);
@@ -1101,6 +1120,11 @@ void swing_output_file(int signal)
         }
         free(newname);
         setbuf(fscript, NULL);
+    }
+    else if (child != 0)
+    {
+        // we are the parent: just forward to our child
+        kill(child, signal);
     }
 }
 
