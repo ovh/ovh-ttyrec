@@ -1131,9 +1131,11 @@ void unlock_session(int signal)
         usleep(1000 * 300);
 
         struct winsize tmpwin;
+        memset(&tmpwin, 0, sizeof(tmpwin));
         (void)ioctl(master, TIOCGWINSZ, (char *)&tmpwin);
 
-        int pixels_per_row = tmpwin.ws_ypixel / tmpwin.ws_row;
+        // guard against ws_row == 0 (failed ioctl or bogus size) to avoid a div-by-zero
+        int pixels_per_row = (tmpwin.ws_row > 0) ? (tmpwin.ws_ypixel / tmpwin.ws_row) : 0;
         tmpwin.ws_row++;
         tmpwin.ws_ypixel += pixels_per_row;
         (void)ioctl(master, TIOCSWINSZ, (char *)&tmpwin);
