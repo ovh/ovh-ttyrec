@@ -196,12 +196,13 @@ jobs:
         git push -f origin continuous
     - name: Upload to Continuous Build
       if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         prerelease: true
         name: "Continuous Build"
         tag_name: continuous
+        fail_on_unmatched_files: true
         files: |
           ${{ steps.getvars.outputs.rpmpath }}
           ${{ steps.getvars.outputs.debpath }}
@@ -209,12 +210,13 @@ jobs:
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         draft: true
         name: ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
+        fail_on_unmatched_files: true
         files: |
           ${{ steps.getvars.outputs.rpmpath }}
           ${{ steps.getvars.outputs.debpath }}
@@ -232,14 +234,15 @@ jobs:
       with:
         persist-credentials: true
 
-    - name: Build for FreeBSD
+    - name: Start FreeBSD VM
       uses: cross-platform-actions/action@master
       with:
         operating_system: freebsd
         version: '14.3'
         shell: bash
         sync_files: runner-to-vm
-    - name: Build for FreeBSD
+
+    - name: Build on FreeBSD VM
       shell: cpa.sh {0}
       run: |
         set -ex
@@ -251,6 +254,21 @@ jobs:
         ./ttyrec -V | grep -qF "zstd[static]"
         file ttyrec | grep -qF "statically"
         version=$(./ttyrec -V | grep -m 1 -Eo "ttyrec v[.0-9]+" | cut -c9-);
+        echo $version > .version
+
+    - name: Fetch artifacts from VM
+      run: cpa.sh --sync-files vm-to-runner
+
+    - name: Prepare dist archive
+      id: getvars
+      run: |
+        version=$(cat .version)
+        if [ -z "$version" ]; then
+          echo "Failed to find version, was the build successful?"
+          pwd
+          find .
+          exit 1
+        fi
         mkdir ovh-ttyrec-$version
         strip ttyrec ttyplay ttytime
         install ttyrec ttyplay ttytime ovh-ttyrec-$version
@@ -267,22 +285,24 @@ jobs:
         git push -f origin continuous
     - name: Upload to Continuous Build
       if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         prerelease: true
         name: "Continuous Build"
         tag_name: continuous
+        fail_on_unmatched_files: true
         files: |
-          ${{ steps.build.outputs.staticname }}
+          ${{ steps.getvars.outputs.staticname }}
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         draft: true
         name: ${{ github.ref_name }}
         tag_name: ${{ github.ref_name }}
+        fail_on_unmatched_files: true
         files: |
-          ${{ steps.build.outputs.staticname }}
+          ${{ steps.getvars.outputs.staticname }}
