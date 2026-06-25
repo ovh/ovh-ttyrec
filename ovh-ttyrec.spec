@@ -1,6 +1,6 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.1.7.1
+Version: 1.2.0.0
 Release: 1
 License: BSD
 Group: Applications/System
@@ -55,6 +55,24 @@ rm -rf -- "$RPM_BUILD_ROOT"
 %{_bindir}/ttyrec
 
 %changelog
+* Tue Jun 23 2026 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.2.0.0
+- feat: ttyrec is now y2038+ compatible, while keeping format compatibility
+- fix: avoid out-of-bounds pointer math in ttyplay .zst detection
+- fix: validate record length in ttyplay before malloc
+- fix: ttyplay: drain pending stdin in one read during playback
+- fix: forward SIGUSR1 to the child and coalesce duplicate rotations
+- fix: alias --lock-timeout to -t, not -l
+- fix: drop duplicate --help entry in long options table
+- fix: enforce 1-19 range for -l/--level
+- fix: reject non-positive ttyplay -s speed
+- fix: avoid div-by-zero in unlock_session redraw
+- fix: better handle empty/corrupt files in ttytime
+- fix: don't try to exec((char *)1) if $SHELL has no slash
+- fix: ttyplay: don't use uninitialised memory on partial header read
+- fix: ttyplay: retry on short reads caused by SIGWINCH
+- fix: check return value of select
+- chore: CI workflow fixes (FreeBSD, exotic arches, deprecations)
+
 * Mon Sep 18 2023 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.1.7.1
 - fix: ttyplay: playing zstd-compressed files created in append mode halted after first stream
 
