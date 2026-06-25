@@ -2,7 +2,6 @@ Source: ovh-ttyrec
 Section: ovh
 Priority: extra
 Maintainer: Stéphane Lesimple <stephane.lesimple@corp.ovh.com>
-Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.7.0
 Homepage: https://github.com/ovh/ovh-ttyrec
 Rules-Requires-Root: no
