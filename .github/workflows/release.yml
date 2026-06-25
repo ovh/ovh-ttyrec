@@ -173,6 +173,8 @@ jobs:
     - name: get release vars
       id: getvars
       run: |
+        set -u
+
         rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
         rpmname=$(basename "$rpmpath")
         echo "RPM package name is $rpmname ($rpmpath)"
