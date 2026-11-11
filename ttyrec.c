@@ -167,6 +167,8 @@ void help(void);
 void set_ttyrec_file_name(char **nameptr);
 void getmaster(void);
 
+ssize_t write_all(int fd, const char *buf, size_t len);
+
 // functions used by the parent
 void doinput(void);
 void sigwinch_handler_parent(int signal);
@@ -898,6 +900,29 @@ void handle_cheatcodes(char c)
 }
 
 
+// a blocking write() bigger than PIPE_BUF returns short when a signal (SIGCHLD
+// on subchild exit) lands mid-transfer, SA_RESTART only restarts it when nothing was written
+ssize_t write_all(int fd, const char *buf, size_t len)
+{
+    size_t done = 0;
+
+    while (done < len)
+    {
+        ssize_t n = write(fd, buf + done, len - done);
+        if (n < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            return -1;
+        }
+        done += (size_t)n;
+    }
+    return (ssize_t)done;
+}
+
+
 // called by parent
 void doinput(void)
 {
@@ -943,7 +968,7 @@ void doinput(void)
             printdbg2("[in:%d]", cc);
             if (!locked_since)
             {
-                if (write(master, ibuf, cc) == -1)
+                if (write_all(master, ibuf, cc) == -1)
                 {
                     perror("write[parent-master]");
                     fail();
@@ -1504,21 +1529,18 @@ void dooutput(void)
         {
             h.len = cc;
             gettimeofday(&h.tv, NULL);
-            if (write(target_fd, obuf, cc) == -1)
+            if (write_all(target_fd, obuf, cc) == -1)
             {
-                if (errno != EINTR)
+                printdbg("write(child-stdout,len=%d): %s", cc, strerror(errno));
+                if (stdout_pipe_opened)
                 {
-                    printdbg("write(child-stdout,len=%d): %s", cc, strerror(errno));
-                    if (stdout_pipe_opened)
-                    {
-                        close(stdout_pipe[0]);
-                    }
-                    if (stderr_pipe_opened)
-                    {
-                        close(stderr_pipe[0]);
-                    }
-                    break;
+                    close(stdout_pipe[0]);
                 }
+                if (stderr_pipe_opened)
+                {
+                    close(stderr_pipe[0]);
+                }
+                break;
             }
             if (!dont_write)
             {
