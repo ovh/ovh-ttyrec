@@ -22,7 +22,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7.0.1
       with:
         persist-credentials: false
 
@@ -107,7 +107,7 @@ jobs:
           - platform: linux/amd64
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7.0.1
       with:
         persist-credentials: true
 
@@ -198,7 +198,7 @@ jobs:
         git push -f origin continuous
     - name: Upload to Continuous Build
       if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v3.0.4
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         prerelease: true
@@ -212,7 +212,7 @@ jobs:
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v3.0.4
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         draft: true
@@ -232,12 +232,12 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7.0.1
       with:
         persist-credentials: true
 
     - name: Start FreeBSD VM
-      uses: cross-platform-actions/action@master
+      uses: cross-platform-actions/action@v1.7.0
       with:
         operating_system: freebsd
         version: '14.3'
@@ -287,7 +287,7 @@ jobs:
         git push -f origin continuous
     - name: Upload to Continuous Build
       if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v3.0.4
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         prerelease: true
@@ -299,7 +299,7 @@ jobs:
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@v3.0.4
       with:
         token: "${{ secrets.GITHUB_TOKEN }}"
         draft: true
