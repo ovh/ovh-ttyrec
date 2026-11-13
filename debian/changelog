@@ -1,3 +1,12 @@
+ovh-ttyrec (1.2.0.1) master; urgency=medium
+
+  * fix: write the whole buffer when relaying output, avoiding holes in the output with slow readers (#61, #62)
+  * fix: stop write retries on session lock and zero progress (#62)
+  * fix: record output sent before a write failure (#62)
+  * fix: ensure fail() never returns (#64)
+
+ -- Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>  Fri, 13 Nov 2026 17:00:00 +0100
+
 ovh-ttyrec (1.2.0.0) master; urgency=medium
 
   * feat: ttyrec is now y2038+ compatible, while keeping format compatibility
