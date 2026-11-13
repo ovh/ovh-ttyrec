@@ -902,11 +902,13 @@ void handle_cheatcodes(char c)
 
 // a blocking write() bigger than PIPE_BUF returns short when a signal (SIGCHLD
 // on subchild exit) lands mid-transfer, SA_RESTART only restarts it when nothing was written
+// Return a short count if the session locks, discarding the unsent remainder.
+// A zero-progress write is an error, not a reason to spin indefinitely.
 ssize_t write_all(int fd, const char *buf, size_t len)
 {
     size_t done = 0;
 
-    while (done < len)
+    while ((done < len) && !locked_since)
     {
         ssize_t n = write(fd, buf + done, len - done);
         if (n < 0)
@@ -915,6 +917,11 @@ ssize_t write_all(int fd, const char *buf, size_t len)
             {
                 continue;
             }
+            return -1;
+        }
+        if (n == 0)
+        {
+            errno = EIO;
             return -1;
         }
         done += (size_t)n;
@@ -968,10 +975,16 @@ void doinput(void)
             printdbg2("[in:%d]", cc);
             if (!locked_since)
             {
-                if (write_all(master, ibuf, cc) == -1)
+                ssize_t written = write_all(master, ibuf, cc);
+                if (written == -1)
                 {
                     perror("write[parent-master]");
                     fail();
+                }
+                if (written < cc)
+                {
+                    // The session locked during the write; discard pending input.
+                    continue;
                 }
                 last_activity = time(NULL);
                 lock_warned   = 0;
@@ -1527,9 +1540,9 @@ void dooutput(void)
 
         if (!locked_since && (cc > 0))
         {
-            h.len = cc;
             gettimeofday(&h.tv, NULL);
-            if (write_all(target_fd, obuf, cc) == -1)
+            ssize_t written = write_all(target_fd, obuf, cc);
+            if (written == -1)
             {
                 printdbg("write(child-stdout,len=%d): %s", cc, strerror(errno));
                 if (stdout_pipe_opened)
@@ -1542,6 +1555,13 @@ void dooutput(void)
                 }
                 break;
             }
+            if (written == 0)
+            {
+                continue;
+            }
+            // If the session locked mid-write, record and count only the sent prefix.
+            cc    = written;
+            h.len = cc;
             if (!dont_write)
             {
                 (void)write_header(fscript, &h);

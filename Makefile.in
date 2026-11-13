@@ -37,17 +37,20 @@ ttyplay: ttyplay.o io.o compress.o %COMPRESS_ZSTD%
 ttytime: ttytime.o io.o compress.o %COMPRESS_ZSTD%
 	$(CC) $(CFLAGS) -o $@ ttytime.o io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
 
+tests/test_write_all: tests/test_write_all.c ttyrec.c configure.h ttyrec.h io.h compress.h io.o compress.o %COMPRESS_ZSTD%
+	$(CC) $(CFLAGS) -UNDEBUG -o $@ tests/test_write_all.c io.o compress.o %COMPRESS_ZSTD% $(LDFLAGS) $(LDLIBS)
+
 clean:
-	rm -f *.o $(BINARIES) ttyrecord *~
+	rm -f *.o $(BINARIES) tests/test_write_all ttyrecord *~
 
 distclean: clean
 	rm -f Makefile configure.h
 
 style:
-	uncrustify -c uncrustify.cfg -l C --no-backup *.h *.c
+	uncrustify -c uncrustify.cfg -l C --no-backup *.h *.c tests/*.c
 
 dist:
-	tar cvzf ttyrec.tar.gz *.c *.h docs/ debian/ configure Makefile.in uncrustify.cfg
+	tar cvzf ttyrec.tar.gz *.c *.h tests/*.c docs/ debian/ configure Makefile.in uncrustify.cfg
 
 install:
 	install -d $(DESTDIR)$(BINDIR)
@@ -55,5 +58,6 @@ install:
 	install -d $(DESTDIR)$(MANDIR)/man1
 	install -m 0644 docs/* $(DESTDIR)$(MANDIR)/man1/
 
-test: all
+test: all tests/test_write_all
 	./ttyrec -V
+	./tests/test_write_all
