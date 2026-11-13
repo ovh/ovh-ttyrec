@@ -1,6 +1,6 @@
 Summary: Extended (but compatible) fork of ttyrec
 Name: ovh-ttyrec
-Version: 1.2.0.0
+Version: 1.2.0.1
 Release: 1
 License: BSD
 Group: Applications/System
@@ -55,6 +55,12 @@ rm -rf -- "$RPM_BUILD_ROOT"
 %{_bindir}/ttyrec
 
 %changelog
+* Fri Nov 13 2026 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.2.0.1
+- fix: write the whole buffer when relaying output, avoiding holes in the output with slow readers (#61, #62)
+- fix: stop write retries on session lock and zero progress (#62)
+- fix: record output sent before a write failure (#62)
+- fix: ensure fail() never returns (#64)
+
 * Tue Jun 23 2026 Stéphane Lesimple (deb packages) <stephane.lesimple@corp.ovh.com>   1.2.0.0
 - feat: ttyrec is now y2038+ compatible, while keeping format compatibility
 - fix: avoid out-of-bounds pointer math in ttyplay .zst detection
