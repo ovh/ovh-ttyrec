@@ -192,6 +192,10 @@ void sighup_handler(int signal);
 
 // other functions used by parent and child
 void done(int status);
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noreturn))
+#endif
 void fail(void);
 void print_termios_info(int fd, const char *prefix);
 
@@ -1613,6 +1617,11 @@ void fail(void)
     fprintf(stderr, "\r\nttyrec: aborting!\r\n");
     (void)kill(0, SIGTERM);
     done(EXIT_FAILURE);
+    // if we're here, done() returned without exiting (it does this if it has already been entered, e.g.
+    // we're in a sighandler that interrupted it). Callers of fail() rely on it never returning, and as such
+    // they free() stuff before calling it, so we can't wait for the interrupted done() to finish, or
+    // we might have use after free() / double free() cases in our callers: just exit now.
+    _exit(EXIT_FAILURE);
 }
 
 
