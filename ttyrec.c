@@ -167,8 +167,11 @@ void help(void);
 void set_ttyrec_file_name(char **nameptr);
 void getmaster(void);
 
+size_t write_all(int fd, const char *buf, size_t len, int *write_error);
+
 // functions used by the parent
 void doinput(void);
+int relay_input(const char *ibuf, size_t len, int *write_error);
 void sigwinch_handler_parent(int signal);
 void *timeout_watcher(void *arg);
 void do_lock(void);
@@ -176,6 +179,7 @@ void handle_cheatcodes(char c);
 
 // functions used by the child
 void dooutput(void);
+int relay_output(int fd, const char *obuf, size_t len, int dont_write, unsigned long long *bytes_out);
 void sigwinch_handler_child(int signal);
 
 // functions used by the subchild
@@ -902,6 +906,57 @@ void handle_cheatcodes(char c)
 }
 
 
+// Write len bytes to fd, retrying on short writes and EINTR: a blocking write() bigger than PIPE_BUF
+// returns short when a signal (SIGCHLD on subchild exit) lands mid-transfer, and SA_RESTART only
+// restarts it when nothing was written.
+// Stop early if the session locks, or on error (a zero-progress write counts as EIO, so we never spin).
+// Return the number of bytes actually written, and set *write_error to 0 or to the errno that stopped us.
+// A short count with *write_error == 0 means the session locked; the caller decides what to do with the rest.
+size_t write_all(int fd, const char *buf, size_t len, int *write_error)
+{
+    size_t done = 0;
+
+    *write_error = 0;
+
+    while ((done < len) && !locked_since)
+    {
+        ssize_t n = write(fd, buf + done, len - done);
+        if (n < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            *write_error = errno;
+            break;
+        }
+        if (n == 0)
+        {
+            *write_error = EIO;
+            break;
+        }
+        done += (size_t)n;
+    }
+    return done;
+}
+
+
+// Relay one chunk of user input to the master.
+// Return 1 if the whole chunk was sent. Otherwise return 0, with *write_error set to the errno
+// on failure, or to 0 if the session locked mid-write (the unsent input is then discarded).
+int relay_input(const char *ibuf, size_t len, int *write_error)
+{
+    if (write_all(master, ibuf, len, write_error) < len)
+    {
+        return 0;
+    }
+    last_activity = time(NULL);
+    lock_warned   = 0;
+    kill_warned   = 0;
+    return 1;
+}
+
+
 // called by parent
 void doinput(void)
 {
@@ -947,14 +1002,18 @@ void doinput(void)
             printdbg2("[in:%d]", cc);
             if (!locked_since)
             {
-                if (write(master, ibuf, cc) == -1)
+                int write_error;
+                if (!relay_input(ibuf, (size_t)cc, &write_error))
                 {
-                    perror("write[parent-master]");
-                    fail();
+                    if (write_error)
+                    {
+                        errno = write_error;
+                        perror("write[parent-master]");
+                        fail();
+                    }
+                    // The session locked during the write; discard pending input.
+                    continue;
                 }
-                last_activity = time(NULL);
-                lock_warned   = 0;
-                kill_warned   = 0;
                 if (cc == 1)
                 {
                     handle_cheatcodes(ibuf[0]);
@@ -1386,8 +1445,7 @@ void dooutput(void)
 
     for ( ; ;)
     {
-        Header h;
-        int    dont_write = 0;
+        int dont_write = 0;
 
         // we have a tty
         if (use_tty)
@@ -1506,33 +1564,20 @@ void dooutput(void)
 
         if (!locked_since && (cc > 0))
         {
-            h.len = cc;
-            gettimeofday(&h.tv, NULL);
-            if (write(target_fd, obuf, cc) == -1)
+            int write_error = relay_output(target_fd, obuf, (size_t)cc, dont_write, &bytes_out);
+            if (write_error)
             {
-                if (errno != EINTR)
+                printdbg("write(child-stdout,len=%d): %s", cc, strerror(write_error));
+                if (stdout_pipe_opened)
                 {
-                    printdbg("write(child-stdout,len=%d): %s", cc, strerror(errno));
-                    if (stdout_pipe_opened)
-                    {
-                        close(stdout_pipe[0]);
-                    }
-                    if (stderr_pipe_opened)
-                    {
-                        close(stderr_pipe[0]);
-                    }
-                    break;
+                    close(stdout_pipe[0]);
                 }
+                if (stderr_pipe_opened)
+                {
+                    close(stderr_pipe[0]);
+                }
+                break;
             }
-            if (!dont_write)
-            {
-                (void)write_header(fscript, &h);
-                (void)fwrite_wrapper(obuf, 1, cc, fscript);
-            }
-            bytes_out    += cc;
-            last_activity = time(NULL);
-            lock_warned   = 0;
-            kill_warned   = 0;
         }
     }
 
@@ -1554,6 +1599,33 @@ void dooutput(void)
         fprintf(stderr, "\r\nTTY_BYTES_OUT=%llu\r\n", bytes_out);
     }
     done(childexit);
+}
+
+
+// Relay one chunk of output to fd, then record and count the part that was actually sent,
+// even if the session locked or a write failed midway.
+// Return 0, or the errno of the write failure.
+int relay_output(int fd, const char *obuf, size_t len, int dont_write, unsigned long long *bytes_out)
+{
+    Header h;
+    int    write_error;
+
+    gettimeofday(&h.tv, NULL);
+    size_t written = write_all(fd, obuf, len, &write_error);
+    if (written > 0)
+    {
+        h.len = (int)written;
+        if (!dont_write)
+        {
+            (void)write_header(fscript, &h);
+            (void)fwrite_wrapper(obuf, 1, written, fscript);
+        }
+        *bytes_out   += written;
+        last_activity = time(NULL);
+        lock_warned   = 0;
+        kill_warned   = 0;
+    }
+    return write_error;
 }
 
 

@@ -61,6 +61,7 @@ jobs:
             exit 1
         fi
         ./ttyrec -V | grep -qF 'zstd'
+        make test
 
     - name: compile without zstd support
       run: |
@@ -68,6 +69,7 @@ jobs:
         if ./ttyrec -V | grep -qF 'zstd'; then
             exit 1
         fi
+        make test
 
     - name: build and test debian package
       run: |
