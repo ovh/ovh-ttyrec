@@ -109,7 +109,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
       with:
-        persist-credentials: true
+        persist-credentials: false
 
     - name: prepare qemu
       run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -172,8 +172,13 @@ jobs:
 
     - name: get release vars
       id: getvars
+      env:
+        PLATFORM: ${{ matrix.platform }}
       run: |
         set -u
+
+        artifactname="ovh-ttyrec-$(echo "$PLATFORM" | tr / -)"
+        echo "artifactname=$artifactname" >> "$GITHUB_OUTPUT"
 
         rpmpath=$(find /tmp/pkg -mindepth 1 -maxdepth 1 -type f -name "*.rpm")
         rpmname=$(basename "$rpmpath")
@@ -191,21 +196,14 @@ jobs:
         echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
         echo "staticpath=$staticpath" >> "$GITHUB_OUTPUT"
 
-    - name: Tag for Continuous Build
+    - name: Upload master build artifacts
       if: github.ref_name == 'master'
-      run: |
-        git tag -f continuous
-        git push -f origin continuous
-    - name: Upload to Continuous Build
-      if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v3.0.4
+      uses: actions/upload-artifact@v7.0.2
       with:
-        token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: true
-        name: "Continuous Build"
-        tag_name: continuous
-        fail_on_unmatched_files: true
-        files: |
+        name: ${{ steps.getvars.outputs.artifactname }}
+        if-no-files-found: error
+        compression-level: 0
+        path: |
           ${{ steps.getvars.outputs.rpmpath }}
           ${{ steps.getvars.outputs.debpath }}
           ${{ steps.getvars.outputs.staticpath }}
@@ -234,7 +232,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
       with:
-        persist-credentials: true
+        persist-credentials: false
 
     - name: Start FreeBSD VM
       uses: cross-platform-actions/action@v1.7.0
@@ -279,23 +277,16 @@ jobs:
         tar cvzf $staticname ovh-ttyrec-$version
         echo "Static tar.gz archive name is $staticname"
         echo "staticname=$staticname" >> "$GITHUB_OUTPUT"
+        echo "artifactname=ovh-ttyrec-freebsd-$(uname -m)" >> "$GITHUB_OUTPUT"
 
-    - name: Tag for Continuous Build
+    - name: Upload master build artifacts
       if: github.ref_name == 'master'
-      run: |
-        git tag -f continuous
-        git push -f origin continuous
-    - name: Upload to Continuous Build
-      if: github.ref_name == 'master'
-      uses: softprops/action-gh-release@v3.0.4
+      uses: actions/upload-artifact@v7.0.2
       with:
-        token: "${{ secrets.GITHUB_TOKEN }}"
-        prerelease: true
-        name: "Continuous Build"
-        tag_name: continuous
-        fail_on_unmatched_files: true
-        files: |
-          ${{ steps.getvars.outputs.staticname }}
+        name: ${{ steps.getvars.outputs.artifactname }}
+        if-no-files-found: error
+        compression-level: 0
+        path: ${{ steps.getvars.outputs.staticname }}
 
     - name: Upload to Draft Release
       if: github.ref_type == 'tag'
